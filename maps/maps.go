@@ -118,8 +118,8 @@ func (self *OrderedMap[K, V]) EnumValues(f func(v V) bool) {
 
 // Keys returns all keys.
 func (self *OrderedMap[K, V]) Keys() (out []K) {
-	out = make([]K, 0, len(self.valueMap))
-	for k := range self.valueMap {
+	out = make([]K, 0, len(self.keySlice))
+	for _, k := range self.keySlice {
 		out = append(out, k)
 	}
 	return
@@ -127,9 +127,9 @@ func (self *OrderedMap[K, V]) Keys() (out []K) {
 
 // Values returns all values.
 func (self *OrderedMap[K, V]) Values() (out []V) {
-	out = make([]V, 0, len(self.valueMap))
-	for _, v := range self.valueMap {
-		out = append(out, v)
+	out = make([]V, 0, len(self.keySlice))
+	for _, i := range self.keySlice {
+		out = append(out, self.valueMap[i])
 	}
 	return
 }
