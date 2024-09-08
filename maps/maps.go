@@ -116,6 +116,24 @@ func (self *OrderedMap[K, V]) EnumValues(f func(v V) bool) {
 	}
 }
 
+// Keys returns all keys.
+func (self *OrderedMap[K, V]) Keys() (out []K) {
+	out = make([]K, 0, len(self.valueMap))
+	for k := range self.valueMap {
+		out = append(out, k)
+	}
+	return
+}
+
+// Values returns all values.
+func (self *OrderedMap[K, V]) Values() (out []V) {
+	out = make([]V, 0, len(self.valueMap))
+	for _, v := range self.valueMap {
+		out = append(out, v)
+	}
+	return
+}
+
 // OrderedSyncMap is a [OrderedMap] with a mutext that protects all operations.
 type OrderedSyncMap[K comparable, V any] struct {
 	mu sync.Mutex
