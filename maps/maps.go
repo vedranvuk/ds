@@ -187,3 +187,33 @@ func (self *OrderedSyncMap[K, V]) DeleteAt(i int) (v V, b bool) {
 	self.mu.Unlock()
 	return
 }
+
+// EnumKeys enumerates all keys in the map in order as added.
+func (self *OrderedSyncMap[K, V]) EnumKeys(f func(k K) bool) {
+	self.mu.Lock()
+	self.m.EnumKeys(f)
+	self.mu.Unlock()
+}
+
+// EnumValues enumerates all values in the map in order as added.
+func (self *OrderedSyncMap[K, V]) EnumValues(f func(v V) bool) {
+	self.mu.Lock()
+	self.m.EnumValues(f)
+	self.mu.Unlock()
+}
+
+// Keys returns all keys.
+func (self *OrderedSyncMap[K, V]) Keys() (out []K) {
+	self.mu.Lock()
+	out = self.m.Keys()
+	self.mu.Unlock()
+	return
+}
+
+// Values returns all values.
+func (self *OrderedSyncMap[K, V]) Values() (out []V) {
+	self.mu.Lock()
+	out = self.m.Values()
+	self.mu.Unlock()
+	return
+}
