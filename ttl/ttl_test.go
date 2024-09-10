@@ -1,89 +1,150 @@
 package ttl
 
 import (
-	"math/rand"
+	"fmt"
+	"math/rand/v2"
 	"testing"
 	"time"
-
-	"github.com/vedranvuk/strutils"
 )
 
-func RandomKey() string {
-	return strutils.RandomString(true, true, true, 16)
-}
+func TestLatency(t *testing.T) {
 
-func TestTTL(t *testing.T) {
-	var numTimeouts = 0
-	var ttl = NewTTL[string](func(key string) {
-		numTimeouts++
+	var arrivedAt time.Time
+	list := New(func(key int) {
+		arrivedAt = time.Now()
+		fmt.Printf("timed out: %d\n", key)
 	})
-	defer ttl.Stop()
+	defer list.Stop()
 
-	const numLoops = 1000
-	for i := 0; i < numLoops; i++ {
-		ttl.Put(RandomKey(), time.Millisecond*time.Duration(rand.Intn(1000)-rand.Intn(1000)))
-	}
+	expectedAt := time.Now().Add(1 * time.Second)
+	list.Put(42, 1*time.Second)
 
-	var start = time.Now()
-	for numTimeouts != numLoops && time.Since(start) < 5*time.Second {
-		time.Sleep(1 * time.Millisecond)
-	}
+	<-list.Wait()
+	fmt.Printf("list is %v late\n", arrivedAt.Sub(expectedAt))
+}
 
-	if numTimeouts != numLoops {
-		t.Fatal()
+func TestLen(t *testing.T) {
+	list := New[int](func(key int) {})
+	defer list.Stop()
+	list.Put(1, 1*time.Hour)
+	list.Put(2, 1*time.Hour)
+	list.Put(3, 1*time.Hour)
+	if l := list.Len(); l != 3 {
+		t.Fatalf("len failed, expected 3, got %v", l)
 	}
 }
 
-func TestTTLRepeat(t *testing.T) {
-	var numTimeouts = 0
-	var ttl = NewTTL(func(key string) {
-		numTimeouts++
-	})
-	defer ttl.Stop()
+func TestPut(t *testing.T) {
 
-	var keys []string
-	for i := 0; i < 100; i++ {
-		keys = append(keys, RandomKey())
+	var list = New(func(key int) {})
+
+	if err := list.Put(42, 1*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if err := list.Put(42, 1*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if err := list.Put(42, 1*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if err := list.Put(42, 1*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if err := list.Put(42, 1*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if list.Len() != 1 {
+		t.Fatal("put failed")
+	}
+	if err := list.Delete(42); err != nil {
+		t.Fatal(err)
+	}
+	if err := list.Delete(42); err != ErrNotFound {
+		t.Fatal("put failed: expected ErrNotFound")
 	}
 
-	const numLoops = 1000
-	for i := 0; i < numLoops; i++ {
-		ttl.Put(keys[rand.Intn(100)], time.Millisecond*time.Duration(rand.Intn(500)-250))
+	if err := list.Put(42, 1*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	<-list.Wait()
+
+	list.Stop()
+
+	if err := list.Put(42, 1*time.Second); err != ErrNotRunning {
+		t.Fatal("expected ErrNotRunning")
 	}
 }
 
-func BenchmarkPut(b *testing.B) {
-	var ttl = NewTTL[string](nil)
-	defer ttl.Stop()
+func TestDelete(t *testing.T) {
+	list := New[int](func(key int) {})
 
-	var keys = make([]string, b.N)
-	var durs = make([]time.Duration, b.N)
-	for i := 0; i < b.N; i++ {
-		keys[i] = RandomKey()
-		durs[i] = time.Millisecond * time.Duration(rand.Intn(1000)-rand.Intn(1000))
+	list.Put(42, 1*time.Hour)
+	if err := list.Delete(42); err != nil {
+		t.Fatal(err)
 	}
+	if err := list.Delete(69); err != ErrNotFound {
+		t.Fatal("expected ErrNotFound")
+	}
+	list.Stop()
+	if err := list.Delete(42); err != ErrNotRunning {
+		t.Fatal("expected ErrNotRunning")
+	}
+}
 
+func TestPutAscending(t *testing.T) {
+	list := New[int](func(key int) {})
+	for i := 0; i < 10; i++ {
+		list.Put(i, time.Duration(i)*time.Hour)
+	}
+}
+
+func TestPutDescending(t *testing.T) {
+	list := New[int](func(key int) {})
+	for i := 0; i < 10; i++ {
+		list.Put(i+1, time.Duration(10-i+1)*time.Hour)
+	}
+}
+
+func TestPutRandom(t *testing.T) {
+	list := New[int](func(key int) {})
+	keys := rand.Perm(10)
+	for i := 0; i < 10; i++ {
+		list.Put(keys[i], time.Duration(keys[i])*time.Hour)
+	}
+}
+
+func TestRandom(t *testing.T) {
+	const numLoops int = 1e3
+	list := New[int](func(key int) { fmt.Printf("timed out: %d\n", key) })
+	defer list.Stop()
+	keys := rand.Perm(numLoops)
+	for i := 0; i < numLoops; i++ {
+		list.Put(keys[i], time.Duration(keys[i])*time.Millisecond)
+	}
+	<-list.Wait()
+}
+
+func BenchmarkPutAscending(b *testing.B) {
+	list := New[int](func(key int) {})
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ttl.Put(keys[i], durs[i])
+		list.Put(i, time.Duration(i)*time.Hour)
 	}
-	b.StopTimer()
 }
 
-func BenchmarkDelete(b *testing.B) {
-	var ttl = NewTTL[string](nil)
-	defer ttl.Stop()
-
-	var keys = make([]string, b.N)
-	var durs = make([]time.Duration, b.N)
-	for i := 0; i < b.N; i++ {
-		keys[i] = RandomKey()
-		durs[i] = 10 * time.Second
-		ttl.Put(keys[i], durs[i])
-	}
+func BenchmarkPutDescending(b *testing.B) {
+	list := New[int](func(key int) {})
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ttl.Delete(keys[i])
+		list.Put(i+1, time.Duration(b.N-i+1)*time.Hour)
 	}
-	b.StopTimer()
+}
+
+func BenchmarkPutRandom(b *testing.B) {
+	list := New[int](func(key int) {})
+	keys := rand.Perm(b.N + 1)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		list.Put(keys[i], time.Duration(keys[i])*time.Hour)
+	}
 }
