@@ -32,8 +32,9 @@ func (self *OrderedMap[K, V]) Exists(k K) (b bool) {
 
 // Get returns the entry value under key k and a truth if found.
 // if not found a zero value of entry value under key k is rturned.
-func (self *OrderedMap[K, V]) Get(k K) (V, bool) {
-	return self.valueMap[k], true
+func (self *OrderedMap[K, V]) Get(k K) (v V, b bool) {
+	v, b = self.valueMap[k]
+	return 
 }
 
 // Put stores value v under key k and returns a value that was replaced and a
