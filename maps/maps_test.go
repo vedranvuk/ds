@@ -77,7 +77,7 @@ func TestOrderedMap(t *testing.T) {
 		t.Fatal("Put failed to return old value")
 	}
 
-	if v, found := m.Index(1); !found {
+	if v, found := m.GetAt(1); !found {
 		t.Fatal("Index failed to find item")
 	} else if v != 2 {
 		t.Fatal("Index failed to return correct value")

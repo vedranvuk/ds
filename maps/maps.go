@@ -1,6 +1,9 @@
 package maps
 
-import "sync"
+import (
+	"slices"
+	"sync"
+)
 
 // OrderedMap is a generic ordered map which supports comparable keys
 // and any type of value.
@@ -37,6 +40,12 @@ func (self *OrderedMap[K, V]) Get(k K) (v V, b bool) {
 	return 
 }
 
+// GetAt returns value at index i and a truth if found/index is within range.
+func (self *OrderedMap[K, V]) GetAt(i int) (v V, b bool) {
+	v, b = self.valueMap[self.keySlice[i]]
+	return
+}
+
 // Put stores value v under key k and returns a value that was replaced and a
 // truth if value existed under key k and was replaced.
 func (self *OrderedMap[K, V]) Put(k K, v V) (old V, found bool) {
@@ -48,12 +57,6 @@ func (self *OrderedMap[K, V]) Put(k K, v V) (old V, found bool) {
 	self.indexMap[k] = len(self.keySlice) - 1
 	self.valueMap[k] = v
 	return self.z, false
-}
-
-// Index returns value at index i and a truth if found/index is within range.
-func (self *OrderedMap[K, V]) Index(i int) (v V, b bool) {
-	v, b = self.valueMap[self.keySlice[i]]
-	return
 }
 
 // Delete deletes an entry by key and returns value that was at that key and
@@ -169,17 +172,17 @@ func (self *OrderedSyncMap[K, V]) Get(k K) (v V, b bool) {
 	return
 }
 
+func (self *OrderedSyncMap[K, V]) GetAt(i int) (v V, b bool) {
+	self.mu.Lock()
+	v, b = self.m.GetAt(i)
+	self.mu.Unlock()
+	return
+}
+
 func (self *OrderedSyncMap[K, V]) Put(k K, v V) {
 	self.mu.Lock()
 	self.m.Put(k, v)
 	self.mu.Unlock()
-}
-
-func (self *OrderedSyncMap[K, V]) Index(i int) (v V, b bool) {
-	self.mu.Lock()
-	v, b = self.m.Index(i)
-	self.mu.Unlock()
-	return
 }
 
 func (self *OrderedSyncMap[K, V]) DeleteAt(i int) (v V, b bool) {
