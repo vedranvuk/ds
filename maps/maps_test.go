@@ -2,9 +2,11 @@ package maps
 
 import (
 	"fmt"
+	"math/rand/v2"
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 )
 
 func enum(m *OrderedMap[string, int]) {
@@ -205,6 +207,7 @@ func TestSyncMap(t *testing.T) {
 	for i := range numRoutines {
 		go func(i int) {
 			for i := range numLoops + (i * numLoops) {
+				time.Sleep(time.Duration(rand.IntN(100) * int(time.Nanosecond)))
 				m.Put(strconv.Itoa(i), i)
 			}
 			wg.Done()
