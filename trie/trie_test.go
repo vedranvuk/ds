@@ -48,27 +48,20 @@ func TestTrie(t *testing.T) {
 	for _, v := range tests {
 		var old, replaced = tree.Put(v.Key, v.Val)
 		if old != v.Old {
-			tree.Print()
 			t.Fatalf("Put %s failed, Expected old=%v, got old=%v", v.Key, v.Old, old)
 		}
 		if replaced != v.Replaced {
-			tree.Print()
 			t.Fatalf("Put %s failed, Expected replaced=%v, got replaced=%v", v.Key, v.Replaced, replaced)
 		}
 	}
 	for _, v := range tests {
 		var val, found = tree.Get(v.Key)
 		if val != v.Val {
-			tree.Print()
 			t.Fatalf("Get %s failed, Expected val=%v, got val=%v", v.Key, v.Val, val)
 		}
 		if !found {
-			tree.Print()
 			t.Fatalf("Get %s failed, Expected found=true, got found=%v", v.Key, found)
 		}
-	}
-	if testing.Verbose() {
-		tree.Print()
 	}
 }
 
