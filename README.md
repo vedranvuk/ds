@@ -6,6 +6,7 @@ Data structures, various.
 * ttl - Time-To-Live list of generic keys.
 * queue - Generic queue.
 * orderedmap - Generic ordered map.
+* trie - a string prefix tree
 
 ## License
 
