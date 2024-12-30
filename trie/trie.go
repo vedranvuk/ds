@@ -93,10 +93,8 @@ restart:
 
 		// end of node prefix reached
 		if i == len(nodeRunes) {
-			idx, found = currentNode.Branches.find(keyRunes[i])
-
-			// No branches found, insert new.
-			if !found {
+			if idx, found = currentNode.Branches.find(keyRunes[i]); !found {
+				// No branches found, insert new.
 				var newNode = &Node[V]{
 					Prefix:   keyRunes[i:],
 					Value:    value,
@@ -174,12 +172,9 @@ restart:
 		}
 
 		if i == len(npfx) {
-			idx, found = node.Branches.find(qry[i])
-
-			if !found {
+			if idx, found = node.Branches.find(qry[i]); !found {
 				return self.zero, false
 			}
-
 			node = node.Branches[idx]
 			qry = qry[i:]
 			npfx = []rune(node.Prefix)
@@ -188,6 +183,88 @@ restart:
 
 		if qry[i] != npfx[i] {
 			return self.zero, false
+		}
+
+		i++
+	}
+}
+
+// Delete deletes an entry by key. It returns true if entry was found and
+// deleted and false if not found.
+//
+// After an entry has been deleted its parent nodes are traversed back towards
+// root and deleted if they have no other child branches. This means that a
+// single Delete operation may remove additional unused nodes. It can also
+// happen that no nodes get deleted in case the node that contains the value
+// has child branches of its own.
+//
+// It does not merge nodes that have single branches which results in tree
+// fragmentation after delete operations.
+func (self *Trie[V]) Delete(key string) (deleted bool) {
+
+	// TODO merge nodes that have a single child along the parent path to avoid fragmentation.
+
+	if key == "" {
+		return false
+	}
+
+	var qry = []rune(key)
+	var branches = &self.root.Branches
+	var idx, found = branches.find(qry[0])
+	if !found {
+		return false
+	}
+	var node = self.root.Branches[idx]
+	var npfx = []rune(node.Prefix)
+	var path []*Node[V]
+
+restart:
+	var i = 0
+	for {
+		if i == len(qry) {
+			if !node.HasValue {
+				return false
+			}
+			node.Value = self.zero
+			node.HasValue = false
+			for {
+				if len(node.Branches) > 0 {
+					break
+				}
+				if len(path) == 0 {
+					branches = &self.root.Branches
+				} else {
+					branches = &path[len(path)-1].Branches
+				}
+				if idx, found = branches.find(node.Prefix[0]); !found {
+					panic("should not happen")
+				}
+				*branches = slices.Delete(*branches, idx, idx+1)
+				deleted = true
+				if len(path) > 0 {
+					node = path[len(path)-1]
+					path = path[0 : len(path)-1]
+				} else {
+					break
+				}
+			}
+			return
+		}
+
+		if i == len(npfx) {
+			branches = &node.Branches
+			if idx, found = branches.find(qry[i]); !found {
+				return false
+			}
+			path = append(path, node)
+			node = node.Branches[idx]
+			qry = qry[i:]
+			npfx = []rune(node.Prefix)
+			goto restart
+		}
+
+		if qry[i] != npfx[i] {
+			return false
 		}
 
 		i++
@@ -393,6 +470,24 @@ func (self *SyncTrie[V]) Put(key string, value V) (old V, replaced bool) {
 func (self *SyncTrie[V]) Get(key string) (value V, found bool) {
 	self.mutex.RLock()
 	value, found = self.trie.Get(key)
+	self.mutex.Unlock()
+	return
+}
+
+// Delete deletes an entry by key. It returns true if entry was found and
+// deleted and false if not found.
+//
+// After an entry has been deleted its parent nodes are traversed back towards
+// root and deleted if they have no other child branches. This means that a
+// single Delete operation may remove additional unused nodes. It can also
+// happen that no nodes get deleted in case the node that contains the value
+// has child branches of its own.
+//
+// It does not merge nodes that have single branches which results in tree
+// fragmentation after delete operations.
+func (self *SyncTrie[V]) Delete(key string) (deleted bool) {
+	self.mutex.Lock()
+	deleted = self.trie.Delete(key)
 	self.mutex.Unlock()
 	return
 }

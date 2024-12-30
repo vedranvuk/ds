@@ -1,6 +1,7 @@
 package trie
 
 import (
+	"os"
 	"testing"
 
 	"github.com/vedranvuk/strutils"
@@ -63,6 +64,10 @@ func TestTrie(t *testing.T) {
 			t.Fatalf("Get %s failed, Expected found=true, got found=%v", v.Key, found)
 		}
 	}
+	for _, v := range tests {
+		tree.Delete(v.Key)
+	}
+	tree.Print(os.Stdout)
 }
 
 func BenchmarkPut(b *testing.B) {
@@ -88,5 +93,21 @@ func BenchmarkGet(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		tree.Get(entries[i])
+	}
+}
+
+func BenchmarkDelete(b *testing.B) {
+	tree := New[int]()
+	foo := strutils.NewFoo()
+	entries := make([]string, 0, b.N)
+	for i := 0; i < b.N; i++ {
+		entries = append(entries, foo.Name())
+	}
+	for i := 0; i < b.N; i++ {
+		tree.Put(entries[i], i)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		tree.Delete(entries[i])
 	}
 }
