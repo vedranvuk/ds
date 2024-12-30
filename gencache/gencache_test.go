@@ -35,7 +35,7 @@ func TestGenCache(t *testing.T) {
 		{RandomKey(), []byte{9, 10, 11, 12}},
 		{RandomKey(), []byte{13, 14, 15, 16}},
 	}
-	var cache = New[string, []byte](8, 8)
+	var cache = NewGenCache[string, []byte](8, 8)
 	cache.Put(data[0].ID, data[0].Data)
 	cache.Put(data[1].ID, data[1].Data)
 	cache.Put(data[2].ID, data[2].Data)
@@ -68,7 +68,7 @@ func BenchmarkCachePut(b *testing.B) {
 		{RandomKey(), []byte{9, 10, 11, 12}},
 		{RandomKey(), []byte{13, 14, 15, 16}},
 	}
-	var cache = New[string, []byte](8, 8)
+	var cache = NewGenCache[string, []byte](8, 8)
 	cache.Put(data[0].ID, data[0].Data)
 	cache.Put(data[1].ID, data[1].Data)
 	cache.Put(data[2].ID, data[2].Data)
@@ -89,7 +89,7 @@ func BenchmarkCacheGet(b *testing.B) {
 		{RandomKey(), []byte{9, 10, 11, 12}},
 		{RandomKey(), []byte{13, 14, 15, 16}},
 	}
-	var cache = New[string, []byte](8, 8)
+	var cache = NewGenCache[string, []byte](8, 8)
 	cache.Put(data[0].ID, data[0].Data)
 	cache.Put(data[1].ID, data[1].Data)
 	cache.Put(data[2].ID, data[2].Data)

@@ -2,27 +2,22 @@ package gencache
 
 import (
 	"errors"
-	"reflect"
 	"sync"
 	"unsafe"
 )
 
 // GenCache is a generic cache of any type of value V, keyed by a comparable
 // key K.
-//
 type GenCache[K comparable, V any] struct {
-	mutex sync.RWMutex
-
 	zero        V
-	valSize     uint32
 	used, limit uint32
 	maxItems    uint32
 	entries     map[K]V
 	order       []K
 }
 
-// New returns a new [GenCache].
-func New[K comparable, V any](memLimit uint32, itemLimit uint32) *GenCache[K, V] {
+// NewGenCache returns a new [GenCache].
+func NewGenCache[K comparable, V any](memLimit uint32, itemLimit uint32) *GenCache[K, V] {
 	var p = &GenCache[K, V]{
 		limit:    memLimit,
 		maxItems: itemLimit,
@@ -30,7 +25,6 @@ func New[K comparable, V any](memLimit uint32, itemLimit uint32) *GenCache[K, V]
 		order:    make([]K, itemLimit, itemLimit),
 		zero:     *new(V),
 	}
-	p.valSize = uint32(reflect.TypeOf(p.zero).Size())
 	return p
 }
 
@@ -40,15 +34,6 @@ var ErrCacheMiss = errors.New("cache miss")
 // Get retrieves an item from cache by id.
 // If the item was not found an ErrCacheMiss is returned.
 func (self *GenCache[K, V]) Get(key K) (out V, err error) {
-	self.mutex.RLock()
-	out, err = self.get(key)
-	self.mutex.RUnlock()
-	return
-}
-
-// Get retrieves an item from cache by id.
-// If the item was not found an ErrCacheMiss is returned.
-func (self *GenCache[K, V]) get(key K) (out V, err error) {
 	var exists bool
 	if out, exists = self.entries[key]; !exists {
 		return self.zero, ErrCacheMiss
@@ -59,12 +44,6 @@ func (self *GenCache[K, V]) get(key K) (out V, err error) {
 // Put stores buf into cache under id and rotates the cache if storage limit
 // has been reached.
 func (self *GenCache[K, V]) Put(key K, data V) {
-	self.mutex.Lock()
-	self.put(key, data)
-	self.mutex.Unlock()
-}
-
-func (self *GenCache[K, V]) put(key K, data V) {
 	var dataSize = uint32(unsafe.Sizeof(data))
 	for uint32(self.used+dataSize) > self.limit || uint32(len(self.order)) > self.maxItems {
 		var (
@@ -83,15 +62,6 @@ func (self *GenCache[K, V]) put(key K, data V) {
 // Delete deletes entry under key from cache if it exists and returns truth if
 // it was found and deleted.
 func (self *GenCache[K, V]) Delete(key K) (exists bool) {
-	self.mutex.Lock()
-	exists = self.delete(key)
-	self.mutex.Unlock()
-	return
-}
-
-// Delete deletes entry under key from cache if it exists and returns truth if
-// it was found and deleted.
-func (self *GenCache[K, V]) delete(key K) (exists bool) {
 	var value V
 	if value, exists = self.entries[key]; exists {
 		self.used -= uint32(unsafe.Sizeof(value))
@@ -103,16 +73,64 @@ func (self *GenCache[K, V]) delete(key K) (exists bool) {
 
 // Returns truth if entry under key exists in cache.
 func (self *GenCache[K, V]) Exists(key K) (exists bool) {
-	self.mutex.RLock()
 	_, exists = self.entries[key]
+	return
+}
+
+// Usage returns current memory usage in bytes.
+func (self *GenCache[K, V]) Usage() (used uint32) { return self.used }
+
+// SyncGenCache is the concurrency safe version of [GenCache].
+type SyncGenCache[K comparable, V any] struct {
+	mutex sync.RWMutex
+	GenCache[K, V]
+}
+
+// NewSyncGenCache returns a new [SyncGenCache].
+func NewSyncGenCache[K comparable, V any](memLimit uint32, itemLimit uint32) *SyncGenCache[K, V] {
+	return &SyncGenCache[K, V]{
+		GenCache: *NewGenCache[K, V](memLimit, itemLimit),
+	}
+}
+
+// Get retrieves an item from cache by id.
+// If the item was not found an ErrCacheMiss is returned.
+func (self *SyncGenCache[K, V]) Get(key K) (out V, err error) {
+	self.mutex.RLock()
+	out, err = self.GenCache.Get(key)
+	self.mutex.RUnlock()
+	return
+}
+
+// Put stores buf into cache under id and rotates the cache if storage limit
+// has been reached.
+func (self *SyncGenCache[K, V]) Put(key K, data V) {
+	self.mutex.Lock()
+	self.GenCache.Put(key, data)
+	self.mutex.Unlock()
+}
+
+// Delete deletes entry under key from cache if it exists and returns truth if
+// it was found and deleted.
+func (self *SyncGenCache[K, V]) Delete(key K) (exists bool) {
+	self.mutex.Lock()
+	exists = self.GenCache.Delete(key)
+	self.mutex.Unlock()
+	return
+}
+
+// Returns truth if entry under key exists in cache.
+func (self *SyncGenCache[K, V]) Exists(key K) (exists bool) {
+	self.mutex.RLock()
+	exists = self.GenCache.Exists(key)
 	self.mutex.RUnlock()
 	return
 }
 
 // Usage returns current memory usage in bytes.
-func (self *GenCache[K, V]) Usage() (used uint32) {
+func (self *SyncGenCache[K, V]) Usage() (used uint32) {
 	self.mutex.RLock()
-	used = self.used
+	used = self.GenCache.Usage()
 	self.mutex.RUnlock()
 	return
 }
