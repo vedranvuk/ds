@@ -10,7 +10,6 @@ import (
 // GenCache is a generic cache of any type of value V, keyed by a comparable
 // key K.
 //
-// Size of V is determined from its zero value.
 type GenCache[K comparable, V any] struct {
 	mutex sync.RWMutex
 
