@@ -1,3 +1,7 @@
+// Copyright 2024 Vedran Vuk. All rights reserved.
+// Use of this source code is governed by a MIT
+// license that can be found in the LICENSE file.
+
 // Package trie implements a string prefix trie.
 package trie
 
@@ -200,19 +204,19 @@ restart:
 //
 // It does not merge nodes that have single branches which results in tree
 // fragmentation after delete operations.
-func (self *Trie[V]) Delete(key string) (deleted bool) {
+func (self *Trie[V]) Delete(key string) (value V, deleted bool) {
 
 	// TODO merge nodes that have a single child along the parent path to avoid fragmentation.
 
 	if key == "" {
-		return false
+		return self.zero, false
 	}
 
 	var qry = []rune(key)
 	var branches = &self.root.Branches
 	var idx, found = branches.find(qry[0])
 	if !found {
-		return false
+		return self.zero, false
 	}
 	var node = self.root.Branches[idx]
 	var npfx = []rune(node.Prefix)
@@ -223,8 +227,9 @@ restart:
 	for {
 		if i == len(qry) {
 			if !node.HasValue {
-				return false
+				return self.zero, false
 			}
+			value, deleted = node.Value, true
 			node.Value = self.zero
 			node.HasValue = false
 			for {
@@ -254,7 +259,7 @@ restart:
 		if i == len(npfx) {
 			branches = &node.Branches
 			if idx, found = branches.find(qry[i]); !found {
-				return false
+				return self.zero, false
 			}
 			path = append(path, node)
 			node = node.Branches[idx]
@@ -264,7 +269,7 @@ restart:
 		}
 
 		if qry[i] != npfx[i] {
-			return false
+			return self.zero, false
 		}
 
 		i++
@@ -485,9 +490,9 @@ func (self *SyncTrie[V]) Get(key string) (value V, found bool) {
 //
 // It does not merge nodes that have single branches which results in tree
 // fragmentation after delete operations.
-func (self *SyncTrie[V]) Delete(key string) (deleted bool) {
+func (self *SyncTrie[V]) Delete(key string) (value V, deleted bool) {
 	self.mutex.Lock()
-	deleted = self.trie.Delete(key)
+	value, deleted = self.trie.Delete(key)
 	self.mutex.Unlock()
 	return
 }
