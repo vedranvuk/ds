@@ -188,6 +188,13 @@ func (self *OrderedSyncMap[K, V]) Put(k K, v V) {
 	self.mu.Unlock()
 }
 
+func (self *OrderedSyncMap[K, V]) Delete(k K) (v V, b bool) {
+	self.mu.Lock()
+	v, b = self.m.Delete(k)
+	self.mu.Unlock()
+	return
+}
+
 func (self *OrderedSyncMap[K, V]) DeleteAt(i int) (v V, b bool) {
 	self.mu.Lock()
 	v, b = self.m.DeleteAt(i)
