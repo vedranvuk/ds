@@ -46,19 +46,18 @@ func TestGenCache(t *testing.T) {
 	cache.Put(data[3].ID, data[3].Data)
 
 	var (
-		err error
 		buf []byte
+		found bool
 	)
-
-	if buf, err = cache.Get(data[2].ID); err != nil {
-		t.Fatal(err)
+	if buf, found = cache.Get(data[2].ID); !found {
+		t.Fatal("not found")
 	}
 	if !equalByteSlice(buf, data[2].Data) {
 		t.Fatal(errors.New("unexpected data"))
 	}
 
-	if buf, err = cache.Get(data[3].ID); err != nil {
-		t.Fatal(err)
+	if buf, found = cache.Get(data[3].ID); !found {
+		t.Fatal("not found")
 	}
 	if !equalByteSlice(buf, data[3].Data) {
 		t.Fatal(errors.New("unexpected data"))

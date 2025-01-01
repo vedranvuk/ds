@@ -5,7 +5,6 @@
 package gencache
 
 import (
-	"errors"
 	"sync"
 	"unsafe"
 )
@@ -32,22 +31,19 @@ func NewGenCache[K comparable, V any](memLimit uint32, itemLimit uint32) *GenCac
 	return p
 }
 
-// ErrCacheMiss is returned by Cache.Get if item is not found in cache.
-var ErrCacheMiss = errors.New("cache miss")
-
-// Get retrieves an item from cache by id.
-// If the item was not found an ErrCacheMiss is returned.
-func (self *GenCache[K, V]) Get(key K) (out V, err error) {
-	var exists bool
-	if out, exists = self.entries[key]; !exists {
-		return self.zero, ErrCacheMiss
+// Get retrieves an item from cache by id and true if found. Otherwise returns 
+// zero value of V and false.
+func (self *GenCache[K, V]) Get(key K) (value V, found bool) {
+	if value, found = self.entries[key]; !found {
+		return self.zero, false
 	}
 	return
 }
 
 // Put stores buf into cache under id and rotates the cache if storage limit
-// has been reached.
-func (self *GenCache[K, V]) Put(key K, data V) {
+// has been reached. It returns the old value if one existed at specified id 
+// and true or zero value of v and false otherwise.
+func (self *GenCache[K, V]) Put(key K, data V) (old V, replaced bool) {
 	var dataSize = uint32(unsafe.Sizeof(data))
 	for uint32(self.used+dataSize) > self.limit || uint32(len(self.order)) > self.maxItems {
 		var (
@@ -55,12 +51,14 @@ func (self *GenCache[K, V]) Put(key K, data V) {
 			delSize = uint32(unsafe.Sizeof(self.entries[delId]))
 		)
 		self.used -= delSize
+		old, replaced = self.entries[delId]
 		delete(self.entries, delId)
 		self.order = self.order[1:]
 	}
 	self.used += dataSize
 	self.order = append(self.order, key)
 	self.entries[key] = data
+	return
 }
 
 // Delete deletes entry under key from cache if it exists and returns truth if
@@ -97,21 +95,23 @@ func NewSyncGenCache[K comparable, V any](memLimit uint32, itemLimit uint32) *Sy
 	}
 }
 
-// Get retrieves an item from cache by id.
-// If the item was not found an ErrCacheMiss is returned.
-func (self *SyncGenCache[K, V]) Get(key K) (out V, err error) {
+// Get retrieves an item from cache by id and true if found. Otherwise returns 
+// zero value of V and false.
+func (self *SyncGenCache[K, V]) Get(key K) (value V, found bool) {
 	self.mutex.RLock()
-	out, err = self.GenCache.Get(key)
+	value, found = self.GenCache.Get(key)
 	self.mutex.RUnlock()
 	return
 }
 
 // Put stores buf into cache under id and rotates the cache if storage limit
-// has been reached.
-func (self *SyncGenCache[K, V]) Put(key K, data V) {
+// has been reached. It returns the old value if one existed at specified id 
+// and true or zero value of v and false otherwise.
+func (self *SyncGenCache[K, V]) Put(key K, data V) (old V, replaced bool) {
 	self.mutex.Lock()
-	self.GenCache.Put(key, data)
+	old, replaced = self.GenCache.Put(key, data)
 	self.mutex.Unlock()
+	return
 }
 
 // Delete deletes entry under key from cache if it exists and returns truth if
