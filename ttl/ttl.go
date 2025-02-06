@@ -45,6 +45,8 @@ type timeout[K comparable] struct {
 }
 
 // Returns a new TTL which calls the optional cb each time a key expires.
+//
+// [TTL] is returned started and should be stopped after use with [TTL.Stop].
 func New[K comparable](cb func(key K)) *TTL[K] {
 	var p = &TTL[K]{
 		dict:       make(map[K]time.Time),

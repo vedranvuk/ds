@@ -5,6 +5,7 @@
 package trie
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/vedranvuk/strutils"
@@ -50,6 +51,17 @@ func TestTrieDelete(t *testing.T) {
     if value != 0 || deleted {
         t.Errorf("expected (0, false), got (%v, %v)", value, deleted)
     }
+}
+
+func TestTriePrefixes(t *testing.T) {
+	tr := New[int]()	
+	tr.Put("/", 0)
+	tr.Put("/users", 0)
+	tr.Put("/users/vedran", 0)
+	tr.Put("/users/vedran/go", 0)
+	if !slices.Equal(tr.Prefixes("/users/vedran/go"), []string{"/", "/users", "/users/vedran"}) {
+		t.Fatal()
+	}
 }
 
 type Test struct {
