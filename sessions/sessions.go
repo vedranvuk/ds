@@ -24,9 +24,9 @@ var (
 	ErrMaxUserSessions = errors.New("maximum user session count reached")
 )
 
-// Sessions maintains a list of keys for a key that time out after a set
+// Map maintains a list of keys for a key that time out after a set
 // duration. Intended for use as an in-memory user session manager.
-type Sessions[K comparable] struct {
+type Map[K comparable] struct {
 	mu                 sync.Mutex
 	z                  K
 	newKey             func() K
@@ -40,10 +40,10 @@ type Sessions[K comparable] struct {
 	totalCount         int
 }
 
-// New returns new [Sessions]. maxSessions controls maximum nunber of sessions
+// New returns new [Map]. maxSessions controls maximum nunber of sessions
 // cumulatively and maxSessionsPerUser limits number of sessions per user.
-func New[K comparable](maxSessions, maxSessionsPerUser int, newKey func() K) (out *Sessions[K]) {
-	out = &Sessions[K]{
+func New[K comparable](maxSessions, maxSessionsPerUser int, newKey func() K) (out *Map[K]) {
+	out = &Map[K]{
 		z:                  *new(K),
 		newKey:             newKey,
 		userCounts:         make(map[K]int),
@@ -59,8 +59,8 @@ func New[K comparable](maxSessions, maxSessionsPerUser int, newKey func() K) (ou
 }
 
 // Add adds a new session for userID and discards it after duration amount
-// unless extended with [Sessions.Extend].
-func (self *Sessions[K]) Add(userID K, duration time.Duration) (sessionID K, err error) {
+// unless extended with [Map.Extend].
+func (self *Map[K]) Add(userID K, duration time.Duration) (sessionID K, err error) {
 	self.mu.Lock()
 	defer self.mu.Unlock()
 	if self.totalCount == self.maxSessions {
@@ -86,7 +86,7 @@ func (self *Sessions[K]) Add(userID K, duration time.Duration) (sessionID K, err
 
 // UserID returns a userID by sessionID and true if session with sessionID
 // exists. Otherwise returns a zero key and false.
-func (self *Sessions[K]) UserID(sessionID K) (userID K, found bool) {
+func (self *Map[K]) UserID(sessionID K) (userID K, found bool) {
 	self.mu.Lock()
 	userID, found = self.sessionToUser[sessionID]
 	self.mu.Unlock()
@@ -94,15 +94,15 @@ func (self *Sessions[K]) UserID(sessionID K) (userID K, found bool) {
 }
 
 // Extend resets the timeout of a session with sessionID to timeout set at
-// with [Sessions.Add] when the session was created.
-func (self *Sessions[K]) Extend(sessionID K) (err error) {
+// with [Map.Add] when the session was created.
+func (self *Map[K]) Extend(sessionID K) (err error) {
 	self.mu.Lock()
 	err = self.extend(sessionID)
 	self.mu.Unlock()
 	return
 }
 
-func (self *Sessions[K]) extend(clientID K) (err error) {
+func (self *Map[K]) extend(clientID K) (err error) {
 	if _, exists := self.sessionToUser[clientID]; !exists {
 		err = ErrNotFound
 	} else {
@@ -112,14 +112,14 @@ func (self *Sessions[K]) extend(clientID K) (err error) {
 }
 
 // RemoveSession removes a session by sessionID.
-func (self *Sessions[K]) RemoveSession(sessionID K) (err error) {
+func (self *Map[K]) RemoveSession(sessionID K) (err error) {
 	self.mu.Lock()
 	err = self.removeSession(sessionID)
 	self.mu.Unlock()
 	return
 }
 
-func (self *Sessions[K]) RemoveUser(userID K) (err error) {
+func (self *Map[K]) RemoveUser(userID K) (err error) {
 	self.mu.Lock()
 	if sessions, exists := self.userToSessions[userID]; exists {
 		for key := range sessions {
@@ -131,7 +131,7 @@ func (self *Sessions[K]) RemoveUser(userID K) (err error) {
 }
 
 // removeSession removes a session by sessionID.
-func (self *Sessions[K]) removeSession(sessionID K) error {
+func (self *Map[K]) removeSession(sessionID K) error {
 	var userID, found = self.sessionToUser[sessionID]
 	if !found {
 		return ErrNotFound
@@ -158,7 +158,7 @@ func (self *Sessions[K]) removeSession(sessionID K) error {
 }
 
 // timeout is an event handler for ttl timeout.
-func (self *Sessions[K]) timeout(key K) {
+func (self *Map[K]) timeout(key K) {
 	self.mu.Lock()
 	self.removeSession(key)
 	self.mu.Unlock()
@@ -166,7 +166,7 @@ func (self *Sessions[K]) timeout(key K) {
 }
 
 // SessionCount returns the total active session count.
-func (self *Sessions[K]) SessionCount() (out int) {
+func (self *Map[K]) SessionCount() (out int) {
 	self.mu.Lock()
 	out = self.totalCount
 	self.mu.Unlock()
@@ -174,7 +174,7 @@ func (self *Sessions[K]) SessionCount() (out int) {
 }
 
 // UserSessionCount returns number of active sessions for a user with userID.
-func (self *Sessions[K]) UserSessionCount(userID K) (out int) {
+func (self *Map[K]) UserSessionCount(userID K) (out int) {
 	self.mu.Lock()
 	out = self.userCounts[userID]
 	self.mu.Unlock()
