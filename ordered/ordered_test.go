@@ -3,10 +3,9 @@
 // Use of this source code is governed by a MIT
 // license that can be found in the LICENSE file.
 
-package maps
+package ordered
 
 import (
-	"fmt"
 	"math/rand/v2"
 	"strconv"
 	"sync"
@@ -14,25 +13,9 @@ import (
 	"time"
 )
 
-func enum[K comparable, V any](m *OrderedMap[K, V]) {
-	if !testing.Verbose() {
-		return
-	}
-
-	m.EnumKeys(func(k K) bool {
-		fmt.Printf("Key: %v\n", k)
-		return true
-	})
-
-	m.EnumValues(func(v V) bool {
-		fmt.Printf("Value: %v\n", v)
-		return true
-	})
-}
-
 func TestOrderedMap(t *testing.T) {
 	t.Run("Basic Operations", func(t *testing.T) {
-		m := MakeOrderedMap[string, int]()
+		m := NewOrderedMap[string, int]()
 
 		// Put and Len
 		m.Put("a", 1)
@@ -174,7 +157,7 @@ func TestOrderedMap(t *testing.T) {
 	})
 
 	t.Run("Deletion Edge Cases", func(t *testing.T) {
-		m := MakeOrderedMap[string, int]()
+		m := NewOrderedMap[string, int]()
 		m.Put("a", 1)
 		m.Put("b", 2)
 		m.Put("c", 3)
@@ -218,7 +201,7 @@ func TestOrderedMap(t *testing.T) {
 		}
 
 		// Delete all elements one by one using DeleteAt
-		m = MakeOrderedMap[string, int]()
+		m = NewOrderedMap[string, int]()
 		m.Put("a", 1)
 		m.Put("b", 2)
 		m.Put("c", 3)
@@ -231,7 +214,7 @@ func TestOrderedMap(t *testing.T) {
 	})
 
 	t.Run("Enum Termination", func(t *testing.T) {
-		m := MakeOrderedMap[string, int]()
+		m := NewOrderedMap[string, int]()
 		m.Put("a", 1)
 		m.Put("b", 2)
 		m.Put("c", 3)
@@ -269,7 +252,7 @@ func TestSyncMap(t *testing.T) {
 	const numRoutines = 4
 
 	t.Run("Concurrent Access", func(t *testing.T) {
-		var m = MakeOrderedSyncMap[string, int]()
+		var m = NewOrderedSyncMap[string, int]()
 		var wg sync.WaitGroup
 		wg.Add(numRoutines)
 
@@ -302,7 +285,7 @@ func TestSyncMap(t *testing.T) {
 	})
 
 	t.Run("Concurrent Delete", func(t *testing.T) {
-		var m = MakeOrderedSyncMap[string, int]()
+		var m = NewOrderedSyncMap[string, int]()
 		var wg sync.WaitGroup
 		wg.Add(numRoutines)
 
@@ -338,7 +321,7 @@ func TestSyncMap(t *testing.T) {
 }
 
 func BenchmarkOrderedMapPut(b *testing.B) {
-	m := MakeOrderedMap[string, int]()
+	m := NewOrderedMap[string, int]()
 	k := make([]string, b.N)
 	for i := 0; i < b.N; i++ {
 		k[i] = strconv.Itoa(i)
@@ -350,7 +333,7 @@ func BenchmarkOrderedMapPut(b *testing.B) {
 }
 
 func BenchmarkOrderedMapGet(b *testing.B) {
-	m := MakeOrderedMap[string, int]()
+	m := NewOrderedMap[string, int]()
 	k := make([]string, b.N)
 	for i := 0; i < b.N; i++ {
 		k[i] = strconv.Itoa(i)
@@ -363,7 +346,7 @@ func BenchmarkOrderedMapGet(b *testing.B) {
 }
 
 func BenchmarkOrderedMapDelete(b *testing.B) {
-	m := MakeOrderedMap[string, int]()
+	m := NewOrderedMap[string, int]()
 	k := make([]string, b.N)
 	for i := 0; i < b.N; i++ {
 		k[i] = strconv.Itoa(i)
@@ -376,7 +359,7 @@ func BenchmarkOrderedMapDelete(b *testing.B) {
 }
 
 func BenchmarkOrderedMapDeleteReverse(b *testing.B) {
-	m := MakeOrderedMap[string, int]()
+	m := NewOrderedMap[string, int]()
 	k := make([]string, b.N)
 	for i := 0; i < b.N; i++ {
 		k[i] = strconv.Itoa(i)
@@ -389,7 +372,7 @@ func BenchmarkOrderedMapDeleteReverse(b *testing.B) {
 }
 
 func BenchmarkOrderedMapDeleteAt(b *testing.B) {
-	m := MakeOrderedMap[string, int]()
+	m := NewOrderedMap[string, int]()
 	k := make([]string, b.N)
 	for i := 0; i < b.N; i++ {
 		k[i] = strconv.Itoa(i)
@@ -402,7 +385,7 @@ func BenchmarkOrderedMapDeleteAt(b *testing.B) {
 }
 
 func BenchmarkOrderedMapDeleteAtReverse(b *testing.B) {
-	m := MakeOrderedMap[string, int]()
+	m := NewOrderedMap[string, int]()
 	k := make([]string, b.N)
 	for i := 0; i < b.N; i++ {
 		k[i] = strconv.Itoa(i)
@@ -415,7 +398,7 @@ func BenchmarkOrderedMapDeleteAtReverse(b *testing.B) {
 }
 
 func BenchmarkOrderedSyncMapPut(b *testing.B) {
-	m := MakeOrderedSyncMap[string, int]()
+	m := NewOrderedSyncMap[string, int]()
 	k := make([]string, b.N)
 	for i := 0; i < b.N; i++ {
 		k[i] = strconv.Itoa(i)
@@ -427,7 +410,7 @@ func BenchmarkOrderedSyncMapPut(b *testing.B) {
 }
 
 func BenchmarkOrderedSyncMapGet(b *testing.B) {
-	m := MakeOrderedSyncMap[string, int]()
+	m := NewOrderedSyncMap[string, int]()
 	k := make([]string, b.N)
 	for i := 0; i < b.N; i++ {
 		k[i] = strconv.Itoa(i)
@@ -440,7 +423,7 @@ func BenchmarkOrderedSyncMapGet(b *testing.B) {
 }
 
 func BenchmarkOrderedSyncMapDelete(b *testing.B) {
-	m := MakeOrderedSyncMap[string, int]()
+	m := NewOrderedSyncMap[string, int]()
 	k := make([]string, b.N)
 	for i := 0; i < b.N; i++ {
 		k[i] = strconv.Itoa(i)
@@ -453,7 +436,7 @@ func BenchmarkOrderedSyncMapDelete(b *testing.B) {
 }
 
 func BenchmarkOrderedSyncMapDeleteReverse(b *testing.B) {
-	m := MakeOrderedSyncMap[string, int]()
+	m := NewOrderedSyncMap[string, int]()
 	k := make([]string, b.N)
 	for i := 0; i < b.N; i++ {
 		k[i] = strconv.Itoa(i)
@@ -466,7 +449,7 @@ func BenchmarkOrderedSyncMapDeleteReverse(b *testing.B) {
 }
 
 func BenchmarkOrderedSyncMapDeleteAt(b *testing.B) {
-	m := MakeOrderedSyncMap[string, int]()
+	m := NewOrderedSyncMap[string, int]()
 	k := make([]string, b.N)
 	for i := 0; i < b.N; i++ {
 		k[i] = strconv.Itoa(i)
@@ -479,7 +462,7 @@ func BenchmarkOrderedSyncMapDeleteAt(b *testing.B) {
 }
 
 func BenchmarkOrderedSyncMapDeleteAtReverse(b *testing.B) {
-	m := MakeOrderedSyncMap[string, int]()
+	m := NewOrderedSyncMap[string, int]()
 	k := make([]string, b.N)
 	for i := 0; i < b.N; i++ {
 		k[i] = strconv.Itoa(i)
