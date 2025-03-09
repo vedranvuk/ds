@@ -80,9 +80,19 @@ func (self *TTL[K]) Len() (l int) {
 // empty and all events have fired.
 func (self *TTL[K]) Wait() chan time.Time {
 	c := make(chan time.Time)
-	self.waitersmu.Lock()
-	self.waiters = append(self.waiters, c)
-	self.waitersmu.Unlock()
+	self.queuemu.Lock()
+	isEmpty := len(self.queue) == 0 && !self.waiting.Load()
+	self.queuemu.Unlock()
+
+	if isEmpty {
+		go func() {
+			c <- time.Now()
+		}()
+	} else {
+		self.waitersmu.Lock()
+		self.waiters = append(self.waiters, c)
+		self.waitersmu.Unlock()
+	}
 	return c
 }
 
@@ -301,6 +311,14 @@ func (self *TTL[K]) insertTimeout(t timeout[K]) {
 			j = h
 		}
 	}
+
+	// Deadlocks in a benchmark
+	// Use copy to insert the element
+	// self.queue = append(self.queue, timeout[K]{})
+	// copy(self.queue[i+1:], self.queue[i:])
+	// self.queue[i] = t
+	// self.dict[t.Key] = t.When
+
 	// Deadlocks in a benchmark.
 	// self.queue = slices.Insert(self.queue, i, t)
 

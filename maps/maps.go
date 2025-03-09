@@ -40,11 +40,14 @@ func (self *OrderedMap[K, V]) Exists(k K) (b bool) {
 // if not found a zero value of entry value under key k is rturned.
 func (self *OrderedMap[K, V]) Get(k K) (v V, b bool) {
 	v, b = self.valueMap[k]
-	return 
+	return
 }
 
 // GetAt returns value at index i and a truth if found/index is within range.
 func (self *OrderedMap[K, V]) GetAt(i int) (v V, b bool) {
+	if i > len(self.keySlice)-1 {
+		return self.z, false
+	}
 	v, b = self.valueMap[self.keySlice[i]]
 	return
 }
