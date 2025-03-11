@@ -65,7 +65,7 @@ func (self *Trie[V]) Put(key string, value V) (old V, replaced bool) {
 	}
 
 	var currentNode = self.root.Branches[idx]
-	var nodeRunes = []rune(currentNode.Prefix)
+	var nodeRunes = currentNode.Prefix
 
 restart:
 	var i = 0
@@ -111,7 +111,7 @@ restart:
 			// Set current node to node under matched branch and restart.
 			currentNode = currentNode.Branches[idx]
 			keyRunes = keyRunes[i:]
-			nodeRunes = []rune(currentNode.Prefix)
+			nodeRunes = currentNode.Prefix
 			goto restart
 		}
 
@@ -163,7 +163,7 @@ func (self *Trie[V]) Get(key string) (value V, found bool) {
 		return self.zero, false
 	}
 	var node = self.root.Branches[idx]
-	var npfx = []rune(node.Prefix)
+	var npfx = node.Prefix
 
 restart:
 	var i = 0
@@ -181,7 +181,7 @@ restart:
 			}
 			node = node.Branches[idx]
 			qry = qry[i:]
-			npfx = []rune(node.Prefix)
+			npfx = node.Prefix
 			goto restart
 		}
 
@@ -219,7 +219,7 @@ func (self *Trie[V]) Delete(key string) (value V, deleted bool) {
 		return self.zero, false
 	}
 	var node = self.root.Branches[idx]
-	var npfx = []rune(node.Prefix)
+	var npfx = node.Prefix
 	var path []*Node[V]
 
 restart:
@@ -264,7 +264,7 @@ restart:
 			path = append(path, node)
 			node = node.Branches[idx]
 			qry = qry[i:]
-			npfx = []rune(node.Prefix)
+			npfx = node.Prefix
 			goto restart
 		}
 
@@ -285,6 +285,10 @@ func (self *Trie[V]) Exists(key string) (exists bool) {
 // Prefixes returns a list of set keys which are a prefix of key.
 func (self *Trie[V]) Prefixes(key string) (out []string) {
 
+	if key == "" {
+		return
+	}
+
 	var scanned []rune
 
 	var qry = []rune(key)
@@ -293,7 +297,7 @@ func (self *Trie[V]) Prefixes(key string) (out []string) {
 		return
 	}
 	var node = self.root.Branches[idx]
-	var npfx = []rune(node.Prefix)
+	var npfx = node.Prefix
 
 restart:
 	var i = 0
@@ -324,7 +328,7 @@ restart:
 
 			node = node.Branches[idx]
 			qry = qry[i:]
-			npfx = []rune(node.Prefix)
+			npfx = node.Prefix
 			goto restart
 		}
 
@@ -339,13 +343,16 @@ restart:
 // HasPrefixes returns true if key has any prefixes.
 func (self *Trie[V]) HasPrefixes(key string) bool {
 
+	if key == "" {
+		return false
+	}
 	var qry = []rune(key)
 	var idx, found = self.root.Branches.find(qry[0])
 	if !found {
 		return false
 	}
 	var node = self.root.Branches[idx]
-	var npfx = []rune(node.Prefix)
+	var npfx = node.Prefix
 
 restart:
 	var i = 0
@@ -366,7 +373,7 @@ restart:
 
 			node = node.Branches[idx]
 			qry = qry[i:]
-			npfx = []rune(node.Prefix)
+			npfx = node.Prefix
 			goto restart
 		}
 
@@ -418,7 +425,7 @@ type Branches[V any] []*Node[V]
 // true or insert index and false if not found.
 func (self Branches[V]) find(r rune) (idx int, match bool) {
 	return binSearch(len(self), func(i int) int {
-		var v = []rune(self[i].Prefix)[0]
+		var v = self[i].Prefix[0]
 		if r > v {
 			return 1
 		} else if r < v {
@@ -475,7 +482,7 @@ func (self *SyncTrie[V]) Put(key string, value V) (old V, replaced bool) {
 func (self *SyncTrie[V]) Get(key string) (value V, found bool) {
 	self.mutex.RLock()
 	value, found = self.trie.Get(key)
-	self.mutex.Unlock()
+	self.mutex.RUnlock()
 	return
 }
 
