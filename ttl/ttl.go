@@ -24,6 +24,7 @@ import (
 type TTL[K comparable] struct {
 	queuemu    sync.Mutex
 	waitersmu  sync.Mutex
+	keys       map[K]struct{}   // Map of all keys currently existing in ttl.
 	running    atomic.Bool      // true while worker is running,
 	waiting    atomic.Bool      // true while a ticker is being waited on to fire.
 	queue      []timeout[K]     // a slice of timeouts sorted by [timeout.When] asc
@@ -49,6 +50,7 @@ type timeout[K comparable] struct {
 // [TTL] is returned started and should be stopped after use with [TTL.Stop].
 func New[K comparable](cb func(key K)) *TTL[K] {
 	var p = &TTL[K]{
+		keys:       make(map[K]struct{}),
 		dict:       make(map[K]time.Time),
 		addTimeout: make(chan timeout[K]),
 		delTimeout: make(chan K),
@@ -103,11 +105,22 @@ func (self *TTL[K]) Put(key K, duration time.Duration) error {
 	if !self.running.Load() {
 		return ErrNotRunning
 	}
+	self.queuemu.Lock()
+	self.keys[key] = struct{}{}
+	self.queuemu.Unlock()
 	self.delTimeout <- key
 	<-self.errchan
 	self.addTimeout <- timeout[K]{time.Now().Add(duration), key}
 	<-self.addTimeout
 	return nil
+}
+
+// Exists returns if key exists in TTL.
+func (self *TTL[K]) Exists(key K) (exists bool) {
+	self.queuemu.Lock()
+	_, exists = self.keys[key]
+	self.queuemu.Unlock()
+	return
 }
 
 // ErrNotFound is returned when delete does not find the item to be deleted.
@@ -119,6 +132,9 @@ func (self *TTL[K]) Delete(key K) (err error) {
 	if !self.running.Load() {
 		return ErrNotRunning
 	}
+	self.queuemu.Lock()
+	delete(self.keys, key)
+	self.queuemu.Unlock()
 	self.delTimeout <- key
 	err = <-self.errchan
 	return
@@ -137,6 +153,9 @@ func (self *TTL[K]) Stop() error {
 
 // doOnTimeout calls ttl.cb if it's not nil and passes key to it.
 func (self *TTL[K]) doOnTimeout(key K) {
+	self.queuemu.Lock()
+	delete(self.keys, key)
+	self.queuemu.Unlock()
 	if self.cb != nil {
 		self.cb(key)
 	}

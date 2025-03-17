@@ -120,7 +120,10 @@ func TestDelete(t *testing.T) {
 	if err != ErrNotFound {
 		t.Fatal("expected ErrNotFound")
 	}
-	list.Stop()
+	err = list.Stop()
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = list.Delete(42)
 	if err != ErrNotRunning {
 		t.Fatal("expected ErrNotRunning")
@@ -432,5 +435,62 @@ func BenchmarkWait(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		<-list.Wait()
+	}
+}
+
+func TestExists(t *testing.T) {
+	list := New[int](func(key int) {})
+	defer list.Stop()
+	var err error
+
+	// Test key exists after put
+	err = list.Put(1, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !list.Exists(1) {
+		t.Fatal("Key should exist")
+	}
+
+	// Test key does not exist after delete
+	err = list.Delete(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if list.Exists(1) {
+		t.Fatal("Key should not exist")
+	}
+
+	// Test key does not exist initially
+	if list.Exists(2) {
+		t.Fatal("Key should not exist initially")
+	}
+
+	// Test after stop
+	err = list.Put(3, time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(5 * time.Millisecond)
+
+	if list.Exists(3) {
+		t.Fatal("Key should not exist after timeout")
+	}
+}
+
+func BenchmarkExists(b *testing.B) {
+	list := New[int](func(key int) {})
+	defer list.Stop()
+	var err error
+	for i := 0; i < b.N; i++ {
+		err = list.Put(i, time.Hour)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		list.Exists(i)
 	}
 }
