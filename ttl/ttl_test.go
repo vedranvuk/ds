@@ -5,7 +5,6 @@
 package ttl
 
 import (
-	"fmt"
 	"math/rand/v2"
 	"sync"
 	"testing"
@@ -17,23 +16,38 @@ func TestLatency(t *testing.T) {
 	var arrivedAt time.Time
 	list := New(func(key int) {
 		arrivedAt = time.Now()
-		fmt.Printf("timed out: %d\n", key)
 	})
 	defer list.Stop()
 
 	expectedAt := time.Now().Add(1 * time.Second)
-	list.Put(42, 1*time.Second)
+	var err error
+	err = list.Put(42, 1*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	<-list.Wait()
-	fmt.Printf("list is %v late\n", arrivedAt.Sub(expectedAt))
+	if arrivedAt.Sub(expectedAt) > 100*time.Millisecond {
+		t.Fatalf("list is too late: %v", arrivedAt.Sub(expectedAt))
+	}
 }
 
 func TestLen(t *testing.T) {
 	list := New[int](func(key int) {})
 	defer list.Stop()
-	list.Put(1, 1*time.Hour)
-	list.Put(2, 1*time.Hour)
-	list.Put(3, 1*time.Hour)
+	var err error
+	err = list.Put(1, 1*time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = list.Put(2, 1*time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = list.Put(3, 1*time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if l := list.Len(); l != 3 {
 		t.Fatalf("len failed, expected 3, got %v", l)
 	}
@@ -42,79 +56,108 @@ func TestLen(t *testing.T) {
 func TestPut(t *testing.T) {
 
 	var list = New(func(key int) {})
+	var err error
 
-	if err := list.Put(42, 1*time.Second); err != nil {
+	err = list.Put(42, 1*time.Second)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := list.Put(42, 1*time.Second); err != nil {
+	err = list.Put(42, 1*time.Second)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := list.Put(42, 1*time.Second); err != nil {
+	err = list.Put(42, 1*time.Second)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := list.Put(42, 1*time.Second); err != nil {
+	err = list.Put(42, 1*time.Second)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := list.Put(42, 1*time.Second); err != nil {
+	err = list.Put(42, 1*time.Second)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if list.Len() != 1 {
 		t.Fatal("put failed")
 	}
-	if err := list.Delete(42); err != nil {
+	err = list.Delete(42)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := list.Delete(42); err != ErrNotFound {
+	err = list.Delete(42)
+	if err != ErrNotFound {
 		t.Fatal("put failed: expected ErrNotFound")
 	}
 
-	if err := list.Put(42, 1*time.Second); err != nil {
+	err = list.Put(42, 1*time.Second)
+	if err != nil {
 		t.Fatal(err)
 	}
 	<-list.Wait()
 
 	list.Stop()
 
-	if err := list.Put(42, 1*time.Second); err != ErrNotRunning {
+	err = list.Put(42, 1*time.Second)
+	if err != ErrNotRunning {
 		t.Fatal("expected ErrNotRunning")
 	}
 }
 
 func TestDelete(t *testing.T) {
 	list := New[int](func(key int) {})
+	var err error
 
-	list.Put(42, 1*time.Hour)
-	if err := list.Delete(42); err != nil {
+	err = list.Put(42, 1*time.Hour)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := list.Delete(69); err != ErrNotFound {
+	err = list.Delete(42)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = list.Delete(69)
+	if err != ErrNotFound {
 		t.Fatal("expected ErrNotFound")
 	}
 	list.Stop()
-	if err := list.Delete(42); err != ErrNotRunning {
+	err = list.Delete(42)
+	if err != ErrNotRunning {
 		t.Fatal("expected ErrNotRunning")
 	}
 }
 
 func TestPutAscending(t *testing.T) {
 	list := New[int](func(key int) {})
+	var err error
 	for i := 0; i < 10; i++ {
-		list.Put(i, time.Duration(i)*time.Hour)
+		err = list.Put(i, time.Duration(i)*time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
 func TestPutDescending(t *testing.T) {
 	list := New[int](func(key int) {})
+	var err error
 	for i := 0; i < 10; i++ {
-		list.Put(i+1, time.Duration(10-i+1)*time.Hour)
+		err = list.Put(i+1, time.Duration(10-i+1)*time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
 func TestPutRandom(t *testing.T) {
 	list := New[int](func(key int) {})
 	keys := rand.Perm(10)
+	var err error
 	for i := 0; i < 10; i++ {
-		list.Put(keys[i], time.Duration(keys[i])*time.Hour)
+		err = list.Put(keys[i], time.Duration(keys[i])*time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -122,14 +165,17 @@ func TestRandom(t *testing.T) {
 	const numLoops int = 1e3
 	var wg sync.WaitGroup
 	list := New[int](func(key int) {
-		fmt.Printf("timed out: %d\n", key)
 		wg.Done()
 	})
 	defer list.Stop()
 	keys := rand.Perm(numLoops)
-	wg.Add(numLoops) // Increment the counter before putting the keys
+	wg.Add(numLoops)
+	var err error
 	for i := 0; i < numLoops; i++ {
-		list.Put(keys[i], time.Duration(keys[i])*time.Millisecond)
+		err = list.Put(keys[i], time.Duration(keys[i])*time.Millisecond)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	wg.Wait()
 }
@@ -137,16 +183,24 @@ func TestRandom(t *testing.T) {
 func BenchmarkPutAscending(b *testing.B) {
 	list := New[int](func(key int) {})
 	b.ResetTimer()
+	var err error
 	for i := 0; i < b.N; i++ {
-		list.Put(i, time.Duration(i)*time.Hour)
+		err = list.Put(i, time.Duration(i)*time.Hour)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
 func BenchmarkPutDescending(b *testing.B) {
 	list := New[int](func(key int) {})
 	b.ResetTimer()
+	var err error
 	for i := 0; i < b.N; i++ {
-		list.Put(i+1, time.Duration(10-i+1)*time.Hour)
+		err = list.Put(i+1, time.Duration(10-i+1)*time.Hour)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -154,8 +208,12 @@ func BenchmarkPutRandom(b *testing.B) {
 	list := New[int](func(key int) {})
 	keys := rand.Perm(b.N + 1)
 	b.ResetTimer()
+	var err error
 	for i := 0; i < b.N; i++ {
-		list.Put(keys[i], time.Duration(keys[i])*time.Hour)
+		err = list.Put(keys[i], time.Duration(keys[i])*time.Hour)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -166,7 +224,6 @@ func TestEmptyTTL(t *testing.T) {
 	waitChan := list.Wait()
 	select {
 	case <-waitChan:
-		// Expected behavior
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("Wait did not return immediately for an empty TTL")
 	}
@@ -176,8 +233,15 @@ func TestOverwrite(t *testing.T) {
 	list := New[int](func(key int) {})
 	defer list.Stop()
 
-	list.Put(1, 100*time.Millisecond)
-	list.Put(1, 200*time.Millisecond)
+	var err error
+	err = list.Put(1, 100*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = list.Put(1, 200*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	time.Sleep(150 * time.Millisecond)
 	if list.Len() != 1 {
@@ -196,7 +260,8 @@ func TestDeleteNonExistent(t *testing.T) {
 	list := New[int](func(key int) {})
 	defer list.Stop()
 
-	err := list.Delete(1)
+	var err error
+	err = list.Delete(1)
 	if err != ErrNotFound {
 		t.Fatalf("Expected ErrNotFound, got %v", err)
 	}
@@ -213,9 +278,16 @@ func TestConcurrentPutDelete(t *testing.T) {
 		wg.Add(1)
 		go func(key int) {
 			defer wg.Done()
-			list.Put(key, 50*time.Millisecond)
+			var err error
+			err = list.Put(key, 50*time.Millisecond)
+			if err != nil {
+				t.Fatal(err)
+			}
 			time.Sleep(time.Duration(rand.IntN(10)) * time.Millisecond) // Introduce some delay
-			list.Delete(key)
+			err = list.Delete(key)
+			if err != nil && err != ErrNotFound {
+				t.Fatal(err)
+			}
 		}(i)
 	}
 
@@ -251,7 +323,11 @@ func TestZeroDuration(t *testing.T) {
 	list := New[int](func(key int) {})
 	defer list.Stop()
 
-	list.Put(1, 0*time.Second)
+	var err error
+	err = list.Put(1, 0*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	<-time.After(50 * time.Millisecond)
 	if list.Len() != 0 {
@@ -263,7 +339,11 @@ func TestNegativeDuration(t *testing.T) {
 	list := New[int](func(key int) {})
 	defer list.Stop()
 
-	list.Put(1, -1*time.Second)
+	var err error
+	err = list.Put(1, -1*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	<-time.After(50 * time.Millisecond)
 	if list.Len() != 0 {
@@ -275,7 +355,11 @@ func TestNilCallback(t *testing.T) {
 	list := New[int](nil)
 	defer list.Stop()
 
-	list.Put(1, 10*time.Millisecond)
+	var err error
+	err = list.Put(1, 10*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
 	<-time.After(50 * time.Millisecond)
 	if list.Len() != 0 {
 		t.Fatal("Key should have expired")
@@ -283,20 +367,70 @@ func TestNilCallback(t *testing.T) {
 }
 
 func TestAddAfterStop(t *testing.T) {
-    list := New[int](nil)
-    list.Stop()
-    err := list.Put(1, time.Second)
-    if err != ErrNotRunning {
-        t.Fatal("Expected ErrNotRunning on Put after Stop")
-    }
+	list := New[int](nil)
+	err := list.Stop()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = list.Put(1, time.Second)
+	if err != ErrNotRunning {
+		t.Fatal("Expected ErrNotRunning on Put after Stop")
+	}
 }
 
 func TestDeleteAfterStop(t *testing.T) {
-    list := New[int](nil)
-    list.Stop()
-    err := list.Delete(1)
-    if err != ErrNotRunning {
-        t.Fatal("Expected ErrNotRunning on Delete after Stop")
-    }
+	list := New[int](nil)
+	err := list.Stop()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = list.Delete(1)
+	if err != ErrNotRunning {
+		t.Fatal("Expected ErrNotRunning on Delete after Stop")
+	}
 }
 
+func BenchmarkLen(b *testing.B) {
+	list := New[int](func(key int) {})
+	defer list.Stop()
+	var err error
+	for i := 0; i < 100; i++ {
+		err = list.Put(i, time.Hour)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		list.Len()
+	}
+}
+
+func BenchmarkDelete(b *testing.B) {
+	list := New[int](func(key int) {})
+	defer list.Stop()
+	var err error
+	for i := 0; i < b.N; i++ {
+		err = list.Put(i, time.Hour)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err = list.Delete(i)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkWait(b *testing.B) {
+	list := New[int](func(key int) {})
+	defer list.Stop()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		<-list.Wait()
+	}
+}
