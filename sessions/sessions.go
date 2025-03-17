@@ -102,15 +102,6 @@ func (self *Map[K]) Extend(sessionID K) (err error) {
 	return
 }
 
-func (self *Map[K]) extend(clientID K) (err error) {
-	if _, exists := self.sessionToUser[clientID]; !exists {
-		err = ErrNotFound
-	} else {
-		return self.timeouts.Put(clientID, self.sessionDurations[clientID])
-	}
-	return
-}
-
 // RemoveSession removes a session by sessionID.
 func (self *Map[K]) RemoveSession(sessionID K) (err error) {
 	self.mu.Lock()
@@ -119,6 +110,8 @@ func (self *Map[K]) RemoveSession(sessionID K) (err error) {
 	return
 }
 
+// RemoveUser removes a user from the session list and all sessions created for
+// the user.
 func (self *Map[K]) RemoveUser(userID K) (err error) {
 	self.mu.Lock()
 	if sessions, exists := self.userToSessions[userID]; exists {
@@ -127,6 +120,32 @@ func (self *Map[K]) RemoveUser(userID K) (err error) {
 		}
 	}
 	self.mu.Unlock()
+	return
+}
+
+// SessionCount returns the total active session count.
+func (self *Map[K]) SessionCount() (out int) {
+	self.mu.Lock()
+	out = self.totalCount
+	self.mu.Unlock()
+	return
+}
+
+// UserSessionCount returns number of active sessions for a user with userID.
+func (self *Map[K]) UserSessionCount(userID K) (out int) {
+	self.mu.Lock()
+	out = self.userCounts[userID]
+	self.mu.Unlock()
+	return
+}
+
+// extend extends the session under sesionID.
+func (self *Map[K]) extend(sessionID K) (err error) {
+	if _, exists := self.sessionToUser[sessionID]; !exists {
+		err = ErrNotFound
+	} else {
+		return self.timeouts.Put(sessionID, self.sessionDurations[sessionID])
+	}
 	return
 }
 
@@ -161,22 +180,6 @@ func (self *Map[K]) removeSession(sessionID K) error {
 func (self *Map[K]) timeout(key K) {
 	self.mu.Lock()
 	self.removeSession(key)
-	self.mu.Unlock()
-	return
-}
-
-// SessionCount returns the total active session count.
-func (self *Map[K]) SessionCount() (out int) {
-	self.mu.Lock()
-	out = self.totalCount
-	self.mu.Unlock()
-	return
-}
-
-// UserSessionCount returns number of active sessions for a user with userID.
-func (self *Map[K]) UserSessionCount(userID K) (out int) {
-	self.mu.Lock()
-	out = self.userCounts[userID]
 	self.mu.Unlock()
 	return
 }

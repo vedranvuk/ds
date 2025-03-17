@@ -299,3 +299,4 @@ func TestDeleteAfterStop(t *testing.T) {
         t.Fatal("Expected ErrNotRunning on Delete after Stop")
     }
 }
+
