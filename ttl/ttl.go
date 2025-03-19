@@ -2,6 +2,8 @@
 // Use of this source code is governed by a MIT
 // license that can be found in the LICENSE file.
 
+// Package ttl provides a Time-To-Live (TTL) list for comparable keys with
+// expiration callbacks.
 package ttl
 
 import (
@@ -11,30 +13,30 @@ import (
 	"time"
 )
 
-// TTL is a Time-To-Live list of comparrable keys that exist only for the
-// duration specified. When a key expires TTL fires the callback specified in
+// TTL is a Time-To-Live list of comparable keys that exist only for the
+// duration specified. When a key expires, TTL fires the callback specified in
 // [New].
 //
 // TTL worker should be stopped manually after use with [TTL.Stop].
 //
 // It works by maintaining an ascending sorted queue of key timeout times that
-// get on the next tick that is upated each time a timeout, update, put or delete occur
-// updates a ticker that ticks at the next timeout time in the queue and
-// fires timeout callback. Precision is "okay", error is always a delay.
+// get on the next tick that is updated each time a timeout, update, put, or delete occurs.
+// It updates a ticker that ticks at the next timeout time in the queue and
+// fires the timeout callback. Precision is "okay"; the error is always a delay.
 type TTL[K comparable] struct {
-	queuemu    sync.Mutex
-	waitersmu  sync.Mutex
-	keys       map[K]struct{}   // Map of all keys currently existing in ttl.
-	running    atomic.Bool      // true while worker is running,
-	waiting    atomic.Bool      // true while a ticker is being waited on to fire.
-	queue      []timeout[K]     // a slice of timeouts sorted by [timeout.When] asc
-	dict       map[K]time.Time  // map of times when a key times out
-	addTimeout chan timeout[K]  // worker comm for adding a new timeout
-	delTimeout chan K           // worker comm for deleting a timeout
-	pingWorker chan bool        // worker comm for starting and stopping worker
-	errchan    chan error       // errchan is used to communicate an error from the worker to the caller method.
-	cb         func(key K)      // timeout callback
-	waiters    []chan time.Time //
+	queuemu    sync.Mutex      // Protects access to the queue, keys and dict.
+	waitersmu  sync.Mutex      // Protects access to the waiters slice.
+	keys       map[K]struct{}  // Map of all keys currently existing in ttl.
+	running    atomic.Bool     // true while worker is running.
+	waiting    atomic.Bool     // true while a ticker is being waited on to fire.
+	queue      []timeout[K]    // A slice of timeouts sorted by [timeout.When] asc.
+	dict       map[K]time.Time // Map of times when a key times out.
+	addTimeout chan timeout[K] // Worker comm for adding a new timeout.
+	delTimeout chan K          // Worker comm for deleting a timeout.
+	pingWorker chan bool       // Worker comm for starting and stopping worker.
+	errchan    chan error      // Errchan is used to communicate an error from the worker to the caller method.
+	cb         func(key K)     // Timeout callback.
+	waiters    []chan time.Time // Slice of channels to notify when the queue is empty.
 }
 
 // timeout stores a key queued for timeout in the ttl queue.
@@ -45,9 +47,22 @@ type timeout[K comparable] struct {
 	Key K
 }
 
-// Returns a new TTL which calls the optional cb each time a key expires.
+// New returns a new TTL which calls the optional cb each time a key expires.
 //
 // [TTL] is returned started and should be stopped after use with [TTL.Stop].
+//
+// Parameters:
+//   - cb: A callback function that is called when a key expires. It receives the expired key as an argument.
+//
+// Returns:
+//   - *TTL[K]: A pointer to the newly created TTL instance.
+//
+// Example:
+//
+//	ttl := ttl.New[string](func(key string) {
+//		fmt.Println("Key expired:", key)
+//	})
+//	defer ttl.Stop()
 func New[K comparable](cb func(key K)) *TTL[K] {
 	var p = &TTL[K]{
 		keys:       make(map[K]struct{}),
@@ -68,6 +83,14 @@ func New[K comparable](cb func(key K)) *TTL[K] {
 var ErrNotRunning = errors.New("ttl is not running")
 
 // Len returns the number of events in the list left to fire.
+//
+// Returns:
+//   - l: The number of events in the queue, including the currently waiting event.
+//
+// Example:
+//
+//	length := ttl.Len()
+//	fmt.Println("Number of events in queue:", length)
 func (self *TTL[K]) Len() (l int) {
 	self.queuemu.Lock()
 	l = len(self.queue)
@@ -80,10 +103,19 @@ func (self *TTL[K]) Len() (l int) {
 
 // Wait returns a channel that returns the current time when the TLL queue is
 // empty and all events have fired.
+//
+// Returns:
+//   - chan time.Time: A channel that will receive the current time when the TTL queue is empty.
+//
+// Example:
+//
+//	done := ttl.Wait()
+//	<-done
+//	fmt.Println("TTL queue is empty")
 func (self *TTL[K]) Wait() chan time.Time {
-	c := make(chan time.Time)
+	var c = make(chan time.Time)
 	self.queuemu.Lock()
-	isEmpty := len(self.queue) == 0 && !self.waiting.Load()
+	var isEmpty = len(self.queue) == 0 && !self.waiting.Load()
 	self.queuemu.Unlock()
 
 	if isEmpty {
@@ -101,7 +133,21 @@ func (self *TTL[K]) Wait() chan time.Time {
 // Put adds the key to ttl which will last for duration.
 // If key is already present its timeout is reset to duration.
 // Returns ErrNotRunning if ttl is stopped.
-func (self *TTL[K]) Put(key K, duration time.Duration) error {
+//
+// Parameters:
+//   - key: The key to add to the TTL.
+//   - duration: The duration for which the key should remain in the TTL.
+//
+// Returns:
+//   - err: An error if the TTL is not running.
+//
+// Example:
+//
+//	err := ttl.Put("mykey", time.Minute)
+//	if err != nil {
+//		fmt.Println("Error putting key:", err)
+//	}
+func (self *TTL[K]) Put(key K, duration time.Duration) (err error) {
 	if !self.running.Load() {
 		return ErrNotRunning
 	}
@@ -116,6 +162,17 @@ func (self *TTL[K]) Put(key K, duration time.Duration) error {
 }
 
 // Exists returns if key exists in TTL.
+//
+// Parameters:
+//   - key: The key to check for existence.
+//
+// Returns:
+//   - exists: True if the key exists in the TTL, false otherwise.
+//
+// Example:
+//
+//	exists := ttl.Exists("mykey")
+//	fmt.Println("Key exists:", exists)
 func (self *TTL[K]) Exists(key K) (exists bool) {
 	self.queuemu.Lock()
 	_, exists = self.keys[key]
@@ -128,6 +185,19 @@ var ErrNotFound = errors.New("not found")
 
 // Delete removes a key from the list.
 // Returns ErrNotRunning if ttl is stopped.
+//
+// Parameters:
+//   - key: The key to remove from the TTL.
+//
+// Returns:
+//   - err: An error if the TTL is not running or if the key is not found.
+//
+// Example:
+//
+//	err := ttl.Delete("mykey")
+//	if err != nil {
+//		fmt.Println("Error deleting key:", err)
+//	}
 func (self *TTL[K]) Delete(key K) (err error) {
 	if !self.running.Load() {
 		return ErrNotRunning
@@ -142,7 +212,17 @@ func (self *TTL[K]) Delete(key K) (err error) {
 
 // Stop stops the worker. This method should be called on shutdown.
 // Returns ErrNotRunning if ttl is already stopped.
-func (self *TTL[K]) Stop() error {
+//
+// Returns:
+//   - err: An error if the TTL is not running.
+//
+// Example:
+//
+//	err := ttl.Stop()
+//	if err != nil {
+//		fmt.Println("Error stopping TTL:", err)
+//	}
+func (self *TTL[K]) Stop() (err error) {
 	if !self.running.Load() {
 		return ErrNotRunning
 	}
@@ -261,7 +341,7 @@ loop:
 		// Fire wait waiters.
 		if !self.waiting.Load() {
 			self.waitersmu.Lock()
-			now := time.Now()
+			var now = time.Now()
 			for _, c := range self.waiters {
 				go func(c chan time.Time) {
 					c <- now
@@ -364,7 +444,7 @@ func (self *TTL[K]) findTimeout(when time.Time) (idx int, found bool) {
 		i, j = 0, n
 	)
 	for i < j {
-		h := int(uint(i+j) >> 1)
+		var h = int(uint(i+j) >> 1)
 		switch self.cmp(when, h) {
 		case 1:
 			i = h + 1

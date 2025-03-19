@@ -1,4 +1,4 @@
-// Copyright 2024 Vedran Vuk. All rights reserved.
+// Copyright 2025 Vedran Vuk. All rights reserved.
 // Use of this source code is governed by a MIT
 // license that can be found in the LICENSE file.
 
@@ -30,6 +30,10 @@ type Trie[V any] struct {
 }
 
 // New returns a new [Trie].
+//
+// Example:
+//
+//	t := trie.New[int]()
 func New[V any]() *Trie[V] {
 	return &Trie[V]{
 		root: new(Node[V]),
@@ -44,6 +48,14 @@ func New[V any]() *Trie[V] {
 //
 // Key must not be empty. If it is no value is inserted and a zero value of V
 // and false is returned.
+//
+// Example:
+//
+//	t := trie.New[int]()
+//	old, replaced := t.Put("foo", 1)
+//	// old == 0, replaced == false
+//	old, replaced = t.Put("foo", 2)
+//	// old == 1, replaced == true
 func (self *Trie[V]) Put(key string, value V) (old V, replaced bool) {
 
 	if key == "" {
@@ -151,6 +163,15 @@ restart:
 // false if not found.
 //
 // Key must not be empty. If it is Get returns a zero value and false.
+//
+// Example:
+//
+//	t := trie.New[int]()
+//	t.Put("foo", 1)
+//	value, found := t.Get("foo")
+//	// value == 1, found == true
+//	value, found = t.Get("bar")
+//	// value == 0, found == false
 func (self *Trie[V]) Get(key string) (value V, found bool) {
 
 	if key == "" {
@@ -204,6 +225,15 @@ restart:
 //
 // It does not merge nodes that have single branches which results in tree
 // fragmentation after delete operations.
+//
+// Example:
+//
+//	t := trie.New[int]()
+//	t.Put("foo", 1)
+//	value, deleted := t.Delete("foo")
+//	// value == 1, deleted == true
+//	value, deleted = t.Delete("foo")
+//	// value == 0, deleted == false
 func (self *Trie[V]) Delete(key string) (value V, deleted bool) {
 
 	// TODO merge nodes that have a single child along the parent path to avoid fragmentation.
@@ -277,12 +307,29 @@ restart:
 }
 
 // Exists returns true if key exists.
+//
+// Example:
+//
+//	t := trie.New[int]()
+//	t.Put("foo", 1)
+//	exists := t.Exists("foo")
+//	// exists == true
+//	exists = t.Exists("bar")
+//	// exists == false
 func (self *Trie[V]) Exists(key string) (exists bool) {
 	_, exists = self.Get(key)
 	return
 }
 
 // Prefixes returns a list of set keys which are a prefix of key.
+//
+// Example:
+//
+//	t := trie.New[int]()
+//	t.Put("foo", 1)
+//	t.Put("foobar", 2)
+//	prefixes := t.Prefixes("foobarbaz")
+//	// prefixes == []string{"foo", "foobar"}
 func (self *Trie[V]) Prefixes(key string) (out []string) {
 
 	if key == "" {
@@ -341,6 +388,16 @@ restart:
 }
 
 // HasPrefixes returns true if key has any prefixes.
+//
+// Example:
+//
+//	t := trie.New[int]()
+//	t.Put("foo", 1)
+//	t.Put("foobar", 2)
+//	hasPrefixes := t.HasPrefixes("foobarbaz")
+//	// hasPrefixes == true
+//	hasPrefixes = t.HasPrefixes("bar")
+//	// hasPrefixes == false
 func (self *Trie[V]) HasPrefixes(key string) bool {
 
 	if key == "" {
@@ -390,6 +447,18 @@ restart:
 //
 // It is formatted as one node per line where child nodes are indented with two
 // spaces each level and line is in format: <indent><prefix>[,value]
+//
+// Example:
+//
+//	t := trie.New[int]()
+//	t.Put("foo", 1)
+//	t.Put("foobar", 2)
+//	t.Print(os.Stdout)
+//
+// Output:
+//
+//	foo,1
+//	  bar,2
 func (self *Trie[V]) Print(w io.Writer) {
 	self.print(w, self.root, 0)
 }
@@ -455,6 +524,10 @@ type SyncTrie[V any] struct {
 }
 
 // NewSyncTrie returns a new [SyncTrie].
+//
+// Example:
+//
+//	t := trie.NewSyncTrie[int]()
 func NewSyncTrie[V any]() *SyncTrie[V] {
 	return &SyncTrie[V]{
 		trie: *New[V](),
@@ -468,6 +541,14 @@ func NewSyncTrie[V any]() *SyncTrie[V] {
 //
 // Key must not be empty. If it is no value is inserted and a zero value of V
 // and false is returned.
+//
+// Example:
+//
+//	t := trie.NewSyncTrie[int]()
+//	old, replaced := t.Put("foo", 1)
+//	// old == 0, replaced == false
+//	old, replaced = t.Put("foo", 2)
+//	// old == 1, replaced == true
 func (self *SyncTrie[V]) Put(key string, value V) (old V, replaced bool) {
 	self.mutex.Lock()
 	old, replaced = self.trie.Put(key, value)
@@ -479,6 +560,15 @@ func (self *SyncTrie[V]) Put(key string, value V) (old V, replaced bool) {
 // false if not found.
 //
 // Key must not be empty. If it is Get returns a zero value and false.
+//
+// Example:
+//
+//	t := trie.NewSyncTrie[int]()
+//	t.Put("foo", 1)
+//	value, found := t.Get("foo")
+//	// value == 1, found == true
+//	value, found = t.Get("bar")
+//	// value == 0, found == false
 func (self *SyncTrie[V]) Get(key string) (value V, found bool) {
 	self.mutex.RLock()
 	value, found = self.trie.Get(key)
@@ -497,6 +587,15 @@ func (self *SyncTrie[V]) Get(key string) (value V, found bool) {
 //
 // It does not merge nodes that have single branches which results in tree
 // fragmentation after delete operations.
+//
+// Example:
+//
+//	t := trie.NewSyncTrie[int]()
+//	t.Put("foo", 1)
+//	value, deleted := t.Delete("foo")
+//	// value == 1, deleted == true
+//	value, deleted = t.Delete("foo")
+//	// value == 0, deleted == false
 func (self *SyncTrie[V]) Delete(key string) (value V, deleted bool) {
 	self.mutex.Lock()
 	value, deleted = self.trie.Delete(key)
@@ -505,6 +604,15 @@ func (self *SyncTrie[V]) Delete(key string) (value V, deleted bool) {
 }
 
 // Exists returns true if key exists.
+//
+// Example:
+//
+//	t := trie.NewSyncTrie[int]()
+//	t.Put("foo", 1)
+//	exists := t.Exists("foo")
+//	// exists == true
+//	exists = t.Exists("bar")
+//	// exists == false
 func (self *SyncTrie[V]) Exists(key string) (exists bool) {
 	self.mutex.RLock()
 	exists = self.trie.Exists(key)
@@ -513,6 +621,14 @@ func (self *SyncTrie[V]) Exists(key string) (exists bool) {
 }
 
 // Prefixes returns a list of set keys which are a prefix of key.
+//
+// Example:
+//
+//	t := trie.NewSyncTrie[int]()
+//	t.Put("foo", 1)
+//	t.Put("foobar", 2)
+//	prefixes := t.Prefixes("foobarbaz")
+//	// prefixes == []string{"foo", "foobar"}
 func (self *SyncTrie[V]) Prefixes(key string) (out []string) {
 	self.mutex.RLock()
 	out = self.trie.Prefixes(key)
@@ -521,6 +637,16 @@ func (self *SyncTrie[V]) Prefixes(key string) (out []string) {
 }
 
 // HasPrefixes returns true if key has any prefixes.
+//
+// Example:
+//
+//	t := trie.NewSyncTrie[int]()
+//	t.Put("foo", 1)
+//	t.Put("foobar", 2)
+//	hasPrefixes := t.HasPrefixes("foobarbaz")
+//	// hasPrefixes == true
+//	hasPrefixes = t.HasPrefixes("bar")
+//	// hasPrefixes == false
 func (self *SyncTrie[V]) HasPrefixes(key string) (truth bool) {
 	self.mutex.RLock()
 	truth = self.trie.HasPrefixes(key)
@@ -533,6 +659,18 @@ func (self *SyncTrie[V]) HasPrefixes(key string) (truth bool) {
 //
 // It is formatted as one node per line where child nodes are indented with two
 // spaces each level and line is in format: <indent><prefix>[,value]
+//
+// Example:
+//
+//	t := trie.NewSyncTrie[int]()
+//	t.Put("foo", 1)
+//	t.Put("foobar", 2)
+//	t.Print(os.Stdout)
+//
+// Output:
+//
+//	foo,1
+//	  bar,2
 func (self *SyncTrie[V]) Print(w io.Writer) {
 	self.mutex.RLock()
 	self.trie.Print(w)

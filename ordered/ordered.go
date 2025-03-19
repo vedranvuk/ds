@@ -1,7 +1,8 @@
-// Copyright 2024 Vedran Vuk. All rights reserved.
+// Copyright 2025 Vedran Vuk. All rights reserved.
 // Use of this source code is governed by a MIT
 // license that can be found in the LICENSE file.
 
+// Package ordered implements generic ordered map.
 package ordered
 
 import (
@@ -9,228 +10,481 @@ import (
 )
 
 // Map is a generic ordered map which supports comparable keys
-// and any type of value.
+// and any type of value.  It maintains the order in which keys were
+// inserted.
+//
+// Example:
+//
+//	m := NewOrderedMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	m.Put("three", 3)
+//	fmt.Println(m.Keys())   // Output: [one two three]
+//	fmt.Println(m.Values()) // Output: [1 2 3]
 type Map[K comparable, V any] struct {
-	z        V
-	indexMap map[K]int
-	valueMap map[K]V
-	keySlice []K
+	z        V              // zero value of type V, used for return when not found
+	indexMap map[K]int      // key -> index lookup
+	valueMap map[K]V      // key -> value lookup
+	keySlice []K              // maintains insertion order
 }
 
 // NewOrderedMap returns a new OrderedMap of key K and value V.
+//
+// Example:
+//
+//	m := NewOrderedMap[string, int]()
 func NewOrderedMap[K comparable, V any]() *Map[K, V] {
 	return &Map[K, V]{
-		*new(V),
-		make(map[K]int),
-		make(map[K]V),
-		nil,
+		z:        *new(V),
+		indexMap: make(map[K]int),
+		valueMap: make(map[K]V),
+		keySlice: nil,
 	}
 }
 
-// Len returns number of entries in the map.
-func (self *Map[K, V]) Len() int { return len(self.valueMap) }
-
-// Exists returns truth if an entry under key k exists.
-func (self *Map[K, V]) Exists(k K) (b bool) {
-	_, b = self.valueMap[k]
+// Len returns the number of elements in the map.
+//
+// Example:
+//
+//	m := NewOrderedMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	fmt.Println(m.Len()) // Output: 2
+func (self *Map[K, V]) Len() (length int) {
+	length = len(self.valueMap)
 	return
 }
 
-// Get returns the entry value under key k and a truth if found.
-// if not found a zero value of entry value under key k is rturned.
-func (self *Map[K, V]) Get(k K) (v V, b bool) {
-	v, b = self.valueMap[k]
+// Exists returns true if the given key is present in the map.
+//
+// Example:
+//
+//	m := NewOrderedMap[string, int]()
+//	m.Put("one", 1)
+//	fmt.Println(m.Exists("one"))   // Output: true
+//	fmt.Println(m.Exists("three")) // Output: false
+func (self *Map[K, V]) Exists(key K) (exists bool) {
+	_, exists = self.valueMap[key]
 	return
 }
 
-// GetAt returns value at index i and a truth if found/index is within range.
-func (self *Map[K, V]) GetAt(i int) (v V, b bool) {
-	if i > len(self.keySlice)-1 {
+// Get returns the value associated with the given key and a boolean indicating
+// if the key was found. If the key is not found, it returns the zero value
+// of the value type.
+//
+// Example:
+//
+//	m := NewOrderedMap[string, int]()
+//	m.Put("one", 1)
+//	v, b := m.Get("one")
+//	fmt.Println(v, b)     // Output: 1 true
+//	v, b = m.Get("three")
+//	fmt.Println(v, b)     // Output: 0 false
+func (self *Map[K, V]) Get(key K) (value V, exists bool) {
+	value, exists = self.valueMap[key]
+	return
+}
+
+// GetAt returns the value at the given index and a boolean indicating if the
+// index is valid. If the index is out of bounds, it returns the zero value
+// of the value type.
+//
+// Example:
+//
+//	m := NewOrderedMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	v, b := m.GetAt(0)
+//	fmt.Println(v, b)     // Output: 1 true
+//	v, b = m.GetAt(2)
+//	fmt.Println(v, b)     // Output: 0 false
+func (self *Map[K, V]) GetAt(index int) (value V, exists bool) {
+	if index < 0 || index >= len(self.keySlice) {
 		return self.z, false
 	}
-	v, b = self.valueMap[self.keySlice[i]]
+	value, exists = self.valueMap[self.keySlice[index]]
 	return
 }
 
-// Put stores value v under key k and returns a value that was replaced and a
-// truth if value existed under key k and was replaced.
-func (self *Map[K, V]) Put(k K, v V) (old V, found bool) {
-	if old, found = self.valueMap[k]; found {
-		self.valueMap[k] = v
+// Put inserts or updates a key-value pair in the map. It returns the old value
+// (if any) and a boolean indicating if the value was replaced.
+//
+// Example:
+//
+//	m := NewOrderedMap[string, int]()
+//	old, found := m.Put("one", 1)
+//	fmt.Println(old, found) // Output: 0 false
+//	old, found = m.Put("one", 11)
+//	fmt.Println(old, found) // Output: 1 true
+func (self *Map[K, V]) Put(key K, value V) (oldValue V, replaced bool) {
+	if oldValue, replaced = self.valueMap[key]; replaced {
+		self.valueMap[key] = value
 		return
 	}
-	self.keySlice = append(self.keySlice, k)
-	self.indexMap[k] = len(self.keySlice) - 1
-	self.valueMap[k] = v
+
+	self.keySlice = append(self.keySlice, key)
+	self.indexMap[key] = len(self.keySlice) - 1
+	self.valueMap[key] = value
 	return self.z, false
 }
 
-// Delete deletes an entry by key and returns value that was at that key and
-// truth if item was found and deleted.
-func (self *Map[K, V]) Delete(k K) (value V, exists bool) {
-
-	if value, exists = self.valueMap[k]; !exists {
-		return self.z, false
-	}
-
-	var index = self.indexMap[k]
-	var updateKeys = self.keySlice[index+1:]
-	for _, key := range updateKeys {
-		self.indexMap[key] = self.indexMap[key] - 1
-	}
-	delete(self.indexMap, k)
-	delete(self.valueMap, k)
-	self.keySlice = append(self.keySlice[:index], updateKeys...)
-	return
-}
-
-// Delete deletes entry at index i and returns value that was at that index and
-// truth if item was found and deleted.
-func (self *Map[K, V]) DeleteAt(i int) (value V, exists bool) {
-
-	if i >= len(self.keySlice) {
-		return self.z, false
-	}
-	var key = self.keySlice[i]
-
+// Delete removes a key-value pair from the map. It returns the deleted value
+// and a boolean indicating if the key was found.
+//
+// Example:
+//
+//	m := NewOrderedMap[string, int]()
+//	m.Put("one", 1)
+//	v, b := m.Delete("one")
+//	fmt.Println(v, b)     // Output: 1 true
+//	v, b = m.Delete("one")
+//	fmt.Println(v, b)     // Output: 0 false
+func (self *Map[K, V]) Delete(key K) (value V, exists bool) {
 	if value, exists = self.valueMap[key]; !exists {
 		return self.z, false
 	}
 
-	var updateKeys = self.keySlice[i+1:]
-	for _, key := range updateKeys {
-		self.indexMap[key] = self.indexMap[key] - 1
+	var index = self.indexMap[key]
+	var updateKeys = self.keySlice[index+1:]
+
+	for _, k := range updateKeys {
+		self.indexMap[k]--
 	}
+
+	delete(self.indexMap, key)
+	delete(self.valueMap, key)
+	self.keySlice = append(self.keySlice[:index], updateKeys...)
+
+	return
+}
+
+// DeleteAt removes the key-value pair at the given index. It returns the
+// deleted value and a boolean indicating if the index was valid.
+//
+// Example:
+//
+//	m := NewOrderedMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	v, b := m.DeleteAt(0)
+//	fmt.Println(v, b)     // Output: 1 true
+//	v, b = m.DeleteAt(2)
+//	fmt.Println(v, b)     // Output: 0 false
+func (self *Map[K, V]) DeleteAt(index int) (value V, exists bool) {
+	if index < 0 || index >= len(self.keySlice) {
+		return self.z, false
+	}
+
+	var key = self.keySlice[index]
+	if value, exists = self.valueMap[key]; !exists {
+		return self.z, false
+	}
+
+	var updateKeys = self.keySlice[index+1:]
+	for _, k := range updateKeys {
+		self.indexMap[k]--
+	}
+
 	delete(self.valueMap, key)
 	delete(self.indexMap, key)
-	self.keySlice = append(self.keySlice[:i], updateKeys...)
+	self.keySlice = append(self.keySlice[:index], updateKeys...)
 
 	return
 }
 
-// EnumKeys enumerates all keys in the map in order as added.
-func (self *Map[K, V]) EnumKeys(f func(k K) bool) {
-	for i := 0; i < len(self.keySlice); i++ {
-		if !f(self.keySlice[i]) {
+// EnumKeys iterates over the keys in the map in insertion order, calling the
+// provided function for each key.  Iteration stops if the function returns false.
+//
+// Example:
+//
+//	m := NewOrderedMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	m.EnumKeys(func(k string) bool {
+//		fmt.Println(k)
+//		return true
+//	})
+//
+// Output:
+//
+//	one
+//	two
+func (self *Map[K, V]) EnumKeys(callback func(key K) (cont bool)) {
+	for _, key := range self.keySlice {
+		if !callback(key) {
 			break
 		}
 	}
 }
 
-// EnumValues enumerates all values in the map in order as added.
-func (self *Map[K, V]) EnumValues(f func(v V) bool) {
-	for i := 0; i < len(self.keySlice); i++ {
-		if !f(self.valueMap[self.keySlice[i]]) {
+// EnumValues iterates over the values in the map in insertion order, calling
+// the provided function for each value. Iteration stops if the function
+// returns false.
+//
+// Example:
+//
+//	m := NewOrderedMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	m.EnumValues(func(v int) bool {
+//		fmt.Println(v)
+//		return true
+//	})
+//
+// Output:
+//
+//	1
+//	2
+func (self *Map[K, V]) EnumValues(callback func(value V) (cont bool)) {
+	for _, key := range self.keySlice {
+		if !callback(self.valueMap[key]) {
 			break
 		}
 	}
 }
 
-// Keys returns all keys.
-func (self *Map[K, V]) Keys() (out []K) {
-	out = make([]K, 0, len(self.keySlice))
-	for _, k := range self.keySlice {
-		out = append(out, k)
+// Keys returns a slice containing all the keys in the map, in insertion order.
+//
+// Example:
+//
+//	m := NewOrderedMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	fmt.Println(m.Keys()) // Output: [one two]
+func (self *Map[K, V]) Keys() (keys []K) {
+	keys = make([]K, len(self.keySlice))
+	copy(keys, self.keySlice)
+	return
+}
+
+// Values returns a slice containing all the values in the map, in insertion order.
+//
+// Example:
+//
+//	m := NewOrderedMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	fmt.Println(m.Values()) // Output: [1 2]
+func (self *Map[K, V]) Values() (values []V) {
+	values = make([]V, len(self.keySlice))
+	for i, key := range self.keySlice {
+		values[i] = self.valueMap[key]
 	}
 	return
 }
 
-// Values returns all values.
-func (self *Map[K, V]) Values() (out []V) {
-	out = make([]V, 0, len(self.keySlice))
-	for _, i := range self.keySlice {
-		out = append(out, self.valueMap[i])
-	}
-	return
-}
-
-// SyncMap is a [Map] with a mutext that protects all operations.
+// SyncMap is a thread-safe version of [Map] using a mutex to protect concurrent access.
 type SyncMap[K comparable, V any] struct {
-	mu sync.Mutex
-	m  *Map[K, V]
+	mu sync.Mutex // mutex protecting the map
+	m  *Map[K, V] // the underlying ordered map
 }
 
-// NewOrderedSyncMap returns a new OrderedSyncMap of key K and value V.
+// NewOrderedSyncMap returns a new, empty, thread-safe OrderedSyncMap.
+//
+// Example:
+//
+//	m := NewOrderedSyncMap[string, int]()
 func NewOrderedSyncMap[K comparable, V any]() *SyncMap[K, V] {
 	return &SyncMap[K, V]{
 		m: NewOrderedMap[K, V](),
 	}
 }
 
-func (self *SyncMap[K, V]) Len() (l int) {
+// Len returns the number of elements in the map.
+//
+// Example:
+//
+//	m := NewOrderedSyncMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	fmt.Println(m.Len()) // Output: 2
+func (self *SyncMap[K, V]) Len() (length int) {
 	self.mu.Lock()
-	l = self.m.Len()
+	length = self.m.Len()
 	self.mu.Unlock()
 	return
 }
 
-func (self *SyncMap[K, V]) Exists(k K) (b bool) {
+// Exists returns true if the given key is present in the map.
+//
+// Example:
+//
+//	m := NewOrderedSyncMap[string, int]()
+//	m.Put("one", 1)
+//	fmt.Println(m.Exists("one"))   // Output: true
+//	fmt.Println(m.Exists("three")) // Output: false
+func (self *SyncMap[K, V]) Exists(key K) (exists bool) {
 	self.mu.Lock()
-	b = self.m.Exists(k)
+	exists = self.m.Exists(key)
 	self.mu.Unlock()
 	return
 }
 
-func (self *SyncMap[K, V]) Get(k K) (v V, b bool) {
+// Get returns the value associated with the given key and a boolean indicating
+// if the key was found. If the key is not found, it returns the zero value
+// of the value type.
+//
+// Example:
+//
+//	m := NewOrderedSyncMap[string, int]()
+//	m.Put("one", 1)
+//	v, b := m.Get("one")
+//	fmt.Println(v, b)     // Output: 1 true
+//	v, b = m.Get("three")
+//	fmt.Println(v, b)     // Output: 0 false
+func (self *SyncMap[K, V]) Get(key K) (value V, exists bool) {
 	self.mu.Lock()
-	v, b = self.m.Get(k)
+	value, exists = self.m.Get(key)
 	self.mu.Unlock()
 	return
 }
 
-func (self *SyncMap[K, V]) GetAt(i int) (v V, b bool) {
+// GetAt returns the value at the given index and a boolean indicating if the
+// index is valid. If the index is out of bounds, it returns the zero value
+// of the value type.
+//
+// Example:
+//
+//	m := NewOrderedSyncMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	v, b := m.GetAt(0)
+//	fmt.Println(v, b)     // Output: 1 true
+//	v, b = m.GetAt(2)
+//	fmt.Println(v, b)     // Output: 0 false
+func (self *SyncMap[K, V]) GetAt(index int) (value V, exists bool) {
 	self.mu.Lock()
-	v, b = self.m.GetAt(i)
+	value, exists = self.m.GetAt(index)
 	self.mu.Unlock()
 	return
 }
 
-func (self *SyncMap[K, V]) Put(k K, v V) {
+// Put inserts or updates a key-value pair in the map.
+// It overwrites the existing value, if any.
+//
+// Example:
+//
+//	m := NewOrderedSyncMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	m.Put("one", 11)
+//	fmt.Println(m.Get("one")) // Output: 11 true
+func (self *SyncMap[K, V]) Put(key K, value V) {
 	self.mu.Lock()
-	self.m.Put(k, v)
+	self.m.Put(key, value)
 	self.mu.Unlock()
 }
 
-func (self *SyncMap[K, V]) Delete(k K) (v V, b bool) {
+// Delete removes a key-value pair from the map. It returns the deleted value
+// and a boolean indicating if the key was found.
+//
+// Example:
+//
+//	m := NewOrderedSyncMap[string, int]()
+//	m.Put("one", 1)
+//	v, b := m.Delete("one")
+//	fmt.Println(v, b)     // Output: 1 true
+//	v, b = m.Delete("one")
+//	fmt.Println(v, b)     // Output: 0 false
+func (self *SyncMap[K, V]) Delete(key K) (value V, exists bool) {
 	self.mu.Lock()
-	v, b = self.m.Delete(k)
-	self.mu.Unlock()
-	return
-}
-
-func (self *SyncMap[K, V]) DeleteAt(i int) (v V, b bool) {
-	self.mu.Lock()
-	v, b = self.m.DeleteAt(i)
-	self.mu.Unlock()
-	return
-}
-
-// EnumKeys enumerates all keys in the map in order as added.
-func (self *SyncMap[K, V]) EnumKeys(f func(k K) bool) {
-	self.mu.Lock()
-	self.m.EnumKeys(f)
-	self.mu.Unlock()
-}
-
-// EnumValues enumerates all values in the map in order as added.
-func (self *SyncMap[K, V]) EnumValues(f func(v V) bool) {
-	self.mu.Lock()
-	self.m.EnumValues(f)
-	self.mu.Unlock()
-}
-
-// Keys returns all keys.
-func (self *SyncMap[K, V]) Keys() (out []K) {
-	self.mu.Lock()
-	out = self.m.Keys()
+	value, exists = self.m.Delete(key)
 	self.mu.Unlock()
 	return
 }
 
-// Values returns all values.
-func (self *SyncMap[K, V]) Values() (out []V) {
+// DeleteAt removes the key-value pair at the given index. It returns the
+// deleted value and a boolean indicating if the index was valid.
+//
+// Example:
+//
+//	m := NewOrderedSyncMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	v, b := m.DeleteAt(0)
+//	fmt.Println(v, b)     // Output: 1 true
+//	v, b = m.DeleteAt(2)
+//	fmt.Println(v, b)     // Output: 0 false
+func (self *SyncMap[K, V]) DeleteAt(index int) (value V, exists bool) {
 	self.mu.Lock()
-	out = self.m.Values()
+	value, exists = self.m.DeleteAt(index)
+	self.mu.Unlock()
+	return
+}
+
+// EnumKeys iterates over the keys in the map in insertion order, calling the
+// provided function for each key.  Iteration stops if the function returns false.
+//
+// Example:
+//
+//	m := NewOrderedSyncMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	m.EnumKeys(func(k string) bool {
+//		fmt.Println(k)
+//		return true
+//	})
+//
+// Output:
+//
+//	one
+//	two
+func (self *SyncMap[K, V]) EnumKeys(callback func(key K) (cont bool)) {
+	self.mu.Lock()
+	self.m.EnumKeys(callback)
+	self.mu.Unlock()
+}
+
+// EnumValues iterates over the values in the map in insertion order, calling
+// the provided function for each value. Iteration stops if the function
+// returns false.
+//
+// Example:
+//
+//	m := NewOrderedSyncMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	m.EnumValues(func(v int) bool {
+//		fmt.Println(v)
+//		return true
+//	})
+//
+// Output:
+//
+//	1
+//	2
+func (self *SyncMap[K, V]) EnumValues(callback func(value V) (cont bool)) {
+	self.mu.Lock()
+	self.m.EnumValues(callback)
+	self.mu.Unlock()
+}
+
+// Keys returns a slice containing all the keys in the map, in insertion order.
+//
+// Example:
+//
+//	m := NewOrderedSyncMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	fmt.Println(m.Keys()) // Output: [one two]
+func (self *SyncMap[K, V]) Keys() (keys []K) {
+	self.mu.Lock()
+	keys = self.m.Keys()
+	self.mu.Unlock()
+	return
+}
+
+// Values returns a slice containing all the values in the map, in insertion order.
+//
+// Example:
+//
+//	m := NewOrderedSyncMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	fmt.Println(m.Values()) // Output: [1 2]
+func (self *SyncMap[K, V]) Values() (values []V) {
+	self.mu.Lock()
+	values = self.m.Values()
 	self.mu.Unlock()
 	return
 }

@@ -1,4 +1,4 @@
-// Copyright 2024 Vedran Vuk. All rights reserved.
+// Copyright 2025 Vedran Vuk. All rights reserved.
 // Use of this source code is governed by a MIT
 // license that can be found in the LICENSE file.
 
@@ -11,6 +11,8 @@ import (
 
 // Cache is a simple rotating cache that maintains byte slices in memory up to
 // the defined storage limit, both in memory size and entry count.
+//
+// The cache is safe for concurrent access.
 type Cache struct {
 	mutex sync.RWMutex
 
@@ -22,6 +24,19 @@ type Cache struct {
 
 // NewCache returns a new cache with the given memory usage limit in bytes and
 // maximum entry count.
+//
+// Arguments:
+//
+//   - memLimit: The maximum memory usage of the cache in bytes.
+//   - itemLimit: The maximum number of items that can be stored in the cache.
+//
+// Returns:
+//
+//   - A pointer to a new Cache instance.
+//
+// Example:
+//
+//	cache := NewCache(1024*1024, 100) // 1MB limit, 100 items max
 func NewCache(memLimit uint32, itemLimit uint32) *Cache {
 	var p = &Cache{
 		limit:    memLimit,
@@ -35,8 +50,29 @@ func NewCache(memLimit uint32, itemLimit uint32) *Cache {
 // ErrCacheMiss is returned by Cache.Get if item is not found in cache.
 var ErrCacheMiss = errors.New("cache miss")
 
-// Get retrieves an item from cache by id.
-// If the item was not found an ErrCacheMiss is returned.
+// Get retrieves an item from cache by key.
+//
+// Arguments:
+//
+//   - key: The key of the item to retrieve.
+//
+// Returns:
+//
+//   - out: The byte slice stored under the given key, if found.
+//   - err: An error. ErrCacheMiss if the item was not found.
+//
+// Example:
+//
+//	data, err := cache.Get("my_item")
+//	if err != nil {
+//		if errors.Is(err, ErrCacheMiss) {
+//			fmt.Println("Item not found in cache")
+//		} else {
+//			fmt.Println("Error getting item:", err)
+//		}
+//		return
+//	}
+//	fmt.Println("Item found:", string(data))
 func (self *Cache) Get(key string) (out []byte, err error) {
 	self.mutex.RLock()
 	out, err = self.get(key)
@@ -54,8 +90,18 @@ func (self *Cache) get(key string) (out []byte, err error) {
 	return
 }
 
-// Put stores buf into cache under id and rotates the cache if storage limit
-// has been reached.
+// Put stores data into cache under key and rotates the cache if storage limit
+// has been reached.  If an item with the same key already exists, it will be overwritten.
+//
+// Arguments:
+//
+//   - key: The key under which to store the data.
+//   - data: The byte slice to store in the cache.
+//
+// Example:
+//
+//	data := []byte("some data to cache")
+//	cache.Put("my_item", data)
 func (self *Cache) Put(key string, data []byte) {
 	self.mutex.Lock()
 	self.put(key, data)
@@ -78,8 +124,25 @@ func (self *Cache) put(key string, data []byte) {
 	self.entries[key] = data
 }
 
-// Delete deletes entry under key from cache if it exists and returns truth if
-// it was found and deleted.
+// Delete deletes entry under key from cache if it exists and returns true if
+// it was found and deleted, false otherwise.
+//
+// Arguments:
+//
+//   - key: The key of the item to delete.
+//
+// Returns:
+//
+//   - exists: True if the item was found and deleted, false otherwise.
+//
+// Example:
+//
+//	deleted := cache.Delete("my_item")
+//	if deleted {
+//		fmt.Println("Item deleted from cache")
+//	} else {
+//		fmt.Println("Item not found in cache")
+//	}
 func (self *Cache) Delete(key string) (exists bool) {
 	self.mutex.Lock()
 	exists = self.delete(key)
@@ -99,7 +162,24 @@ func (self *Cache) delete(key string) (exists bool) {
 	return false
 }
 
-// Returns truth if entry under key exists in cache.
+// Exists returns true if an entry under key exists in cache, false otherwise.
+//
+// Arguments:
+//
+//   - key: The key of the item to check for.
+//
+// Returns:
+//
+//   - exists: True if the item exists in the cache, false otherwise.
+//
+// Example:
+//
+//	exists := cache.Exists("my_item")
+//	if exists {
+//		fmt.Println("Item exists in cache")
+//	} else {
+//		fmt.Println("Item does not exist in cache")
+//	}
 func (self *Cache) Exists(key string) (exists bool) {
 	self.mutex.RLock()
 	_, exists = self.entries[key]
@@ -108,6 +188,15 @@ func (self *Cache) Exists(key string) (exists bool) {
 }
 
 // Usage returns current memory usage in bytes.
+//
+// Returns:
+//
+//   - used: The current memory usage of the cache in bytes.
+//
+// Example:
+//
+//	usage := cache.Usage()
+//	fmt.Println("Cache usage:", usage, "bytes")
 func (self *Cache) Usage() (used uint32) {
 	self.mutex.RLock()
 	used = self.used
