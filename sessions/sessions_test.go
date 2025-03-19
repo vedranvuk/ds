@@ -157,14 +157,18 @@ func TestCreateLink(t *testing.T) {
 	var sessionID_2 TestKey
 	sessionID_2, err = sessions.CreateLinked(userID2, time.Minute)
 	assertNoError(t, err, "Add session 2")
+	var sessionID_3 TestKey
+	sessionID_3, err = sessions.CreateLinked(userID2, time.Minute)
+	assertNoError(t, err, "Add session 3")
+	_ = sessionID_3
 
-	var sessionID2 TestKey
-	sessionID2, err = sessions.Create(time.Minute)
-	assertNoError(t, err, "Create session 2")
+	var sessionID_4 TestKey
+	sessionID_4, err = sessions.Create(time.Minute)
+	assertNoError(t, err, "Create session 4")
 
-	err = sessions.Link(sessionID2, userID2, true)
+	err = sessions.Link(sessionID_4, userID2, true)
 	assertErrorIs(t, err, ErrMaxUserSessions, "Link session 3, max user sessions error")
-	assertEqual(t, 4, sessions.SessionCount(), "SessionCount after max user sessions attempted via link")
+	assertEqual(t, 5, sessions.SessionCount(), "SessionCount after max user sessions attempted via link")
 	assertEqual(t, 3, sessions.UserSessionCount(userID2), "UserSessionCount after max user sessions attempted via link")
 
 	// Test linking non-existent session
@@ -177,7 +181,7 @@ func TestCreateLink(t *testing.T) {
 	sessions.RemoveSession(sessionID)
 	sessions.RemoveSession(sessionID_1)
 	sessions.RemoveSession(sessionID_2)
-	sessions.RemoveSession(sessionID2)
+	sessions.RemoveSession(sessionID_3)
 }
 
 func TestUserID(t *testing.T) {
@@ -336,12 +340,12 @@ func TestConcurrentAddExtendTimeout(t *testing.T) {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
+	var sessionID TestKey
+	sessionID, _ = sessions.CreateLinked(userID, time.Millisecond*200)
 	for i := 0; i < 50; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			var sessionID TestKey
-			sessionID, _ = sessions.CreateLinked(userID, time.Millisecond*200)
 			mu.Lock()
 			sessionIDs = append(sessionIDs, sessionID)
 			mu.Unlock()

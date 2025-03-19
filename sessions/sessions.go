@@ -310,10 +310,10 @@ func (self *Map[K]) UserSessionCount(userID K) (out int) {
 
 // extend extends the session under sesionID.
 func (self *Map[K]) extend(sessionID K) (err error) {
-	if _, exists := self.sessionToUser[sessionID]; !exists {
-		err = ErrNotFound
+	if duration, exists := self.sessionDurations[sessionID]; exists {
+		err = self.timeouts.Put(sessionID, duration)
 	} else {
-		return self.timeouts.Put(sessionID, self.sessionDurations[sessionID])
+		err = ErrNotFound
 	}
 	return
 }
