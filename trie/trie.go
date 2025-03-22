@@ -223,8 +223,7 @@ restart:
 // happen that no nodes get deleted in case the node that contains the value
 // has child branches of its own.
 //
-// It does not merge nodes that have single branches which results in tree
-// fragmentation after delete operations.
+// It merges nodes that have single branches along the parent path to avoid fragmentation.
 //
 // Example:
 //
@@ -235,19 +234,19 @@ restart:
 //	value, deleted = t.Delete("foo")
 //	// value == 0, deleted == false
 func (self *Trie[V]) Delete(key string) (value V, deleted bool) {
-
-	// TODO merge nodes that have a single child along the parent path to avoid fragmentation.
-
 	if key == "" {
 		return self.zero, false
 	}
 
 	var qry = []rune(key)
 	var branches = &self.root.Branches
-	var idx, found = branches.find(qry[0])
-	if !found {
+	var idx int
+	var found bool
+
+	if idx, found = branches.find(qry[0]); !found {
 		return self.zero, false
 	}
+
 	var node = self.root.Branches[idx]
 	var npfx = node.Prefix
 	var path []*Node[V]
@@ -262,26 +261,42 @@ restart:
 			value, deleted = node.Value, true
 			node.Value = self.zero
 			node.HasValue = false
-			for {
-				if len(node.Branches) > 0 {
-					break
+
+			// Backtrack and merge/delete nodes
+			for len(path) > 0 {
+				var parent *Node[V] = path[len(path)-1]
+				path = path[:len(path)-1] // Pop the last element
+
+				// Find the index of the current node in the parent's branches
+				var childIndex int
+				var childFound bool
+				if childIndex, childFound = parent.Branches.find(node.Prefix[0]); !childFound {
+					panic("child not found in parent branches") // This should not happen
 				}
-				if len(path) == 0 {
-					branches = &self.root.Branches
-				} else {
-					branches = &path[len(path)-1].Branches
+
+				// If the current node has no branches, delete it from the parent
+				if len(node.Branches) == 0 && !node.HasValue {
+					parent.Branches = slices.Delete(parent.Branches, childIndex, childIndex+1)
+					deleted = true
+					// If the parent now has only one branch, merge it with the parent
+					if len(parent.Branches) == 1 && !parent.HasValue {
+						var remainingChild *Node[V] = parent.Branches[0]
+						parent.Prefix = append(parent.Prefix, remainingChild.Prefix...)
+						parent.Value = remainingChild.Value
+						parent.HasValue = remainingChild.HasValue
+						parent.Branches = remainingChild.Branches
+					}
 				}
-				if idx, found = branches.find(node.Prefix[0]); !found {
+				node = parent // Move up to the parent node
+			}
+
+			// Special case for root node
+			if len(node.Branches) == 0 && !node.HasValue && node != self.root {
+				if idx, found = self.root.Branches.find(node.Prefix[0]); !found {
 					panic("should not happen")
 				}
-				*branches = slices.Delete(*branches, idx, idx+1)
+				self.root.Branches = slices.Delete(self.root.Branches, idx, idx+1)
 				deleted = true
-				if len(path) > 0 {
-					node = path[len(path)-1]
-					path = path[0 : len(path)-1]
-				} else {
-					break
-				}
 			}
 			return
 		}
@@ -305,7 +320,6 @@ restart:
 		i++
 	}
 }
-
 // Exists returns true if key exists.
 //
 // Example:
