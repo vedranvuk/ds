@@ -456,6 +456,69 @@ restart:
 	}
 }
 
+// EnumKeys enumerates all keys in the Trie.
+//
+// It calls the provided function 'f' for each key in the Trie.
+// The enumeration stops if 'f' returns false.
+//
+// Example:
+//
+//	t := New[int]()
+//	t.Insert("foo", 1)
+//	t.Insert("bar", 2)
+//	t.EnumKeys(func(key string) bool {
+//		fmt.Println(key)
+//		return true
+//	})
+func (receiver *Trie[V]) EnumKeys(f func(key string) bool) {
+	receiver.enumKeys(receiver.root, "", f)
+}
+
+func (receiver *Trie[V]) enumKeys(node *Node[V], prefix string, f func(key string) bool) {
+	var currentKey string
+	currentKey = prefix + string(node.Prefix)
+
+	if node.HasValue {
+		if !f(currentKey) {
+			return
+		}
+	}
+
+	for _, child := range node.Branches {
+		receiver.enumKeys(child, currentKey, f)
+	}
+}
+
+// EnumValues enumerates all values in the Trie.
+//
+// It calls the provided function 'f' for each value in the Trie.
+// The enumeration stops if 'f' returns false.
+//
+// Example:
+//
+//	t := New[int]()
+//	t.Insert("foo", 1)
+//	t.Insert("bar", 2)
+//	t.EnumValues(func(value int) bool {
+//		fmt.Println(value)
+//		return true
+//	})
+func (self *Trie[V]) EnumValues(f func(value V) bool) {
+	self.enumValues(self.root, f)
+}
+
+func (receiver *Trie[V]) enumValues(node *Node[V], f func(value V) bool) {
+	if node.HasValue {
+		if !f(node.Value) {
+			return
+		}
+	}
+
+	for _, child := range node.Branches {
+		receiver.enumValues(child, f)
+	}
+}
+
 // Print writes self to writer w as a multiline string representing the tree
 // structure.
 //
