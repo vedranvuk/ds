@@ -320,6 +320,7 @@ restart:
 		i++
 	}
 }
+
 // Exists returns true if key exists.
 //
 // Example:
@@ -453,6 +454,39 @@ restart:
 		}
 
 		i++
+	}
+}
+
+// Enum enumerates all key-value pairs in the Trie.
+//
+// It calls the provided function 'f' for each key-value pair in the Trie.
+// The enumeration stops if 'f' returns false.
+//
+// Example:
+//
+//	t := New[int]()
+//	t.Insert("foo", 1)
+//	t.Insert("bar", 2)
+//	t.Enum(func(key string, value int) bool {
+//		fmt.Println(key, value)
+//		return true
+//	})
+func (self *Trie[V]) Enum(f func(key string, value V) bool) {
+	self.enum(self.root, "", f)
+}
+
+func (self *Trie[V]) enum(node *Node[V], prefix string, f func(key string, value V) bool) {
+	var currentKey string
+	currentKey = prefix + string(node.Prefix)
+
+	if node.HasValue {
+		if !f(currentKey, node.Value) {
+			return
+		}
+	}
+
+	for _, child := range node.Branches {
+		self.enum(child, currentKey, f)
 	}
 }
 
