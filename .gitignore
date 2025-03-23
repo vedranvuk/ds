@@ -1,0 +1,42 @@
+# Binaries for programs and plugins
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with go test -c
+*.test
+
+# Vendor directory
+/vendor
+
+# Go modules
+go.sum
+
+# Go build cache
+/tmp
+/build
+
+# IDE
+.idea/
+*.swp
+*.swo
+*.DS_Store
+
+# Log files
+*.log
+
+# Temporary files
+*~
+\#*
+
+# Code coverage files
+*.out
+*.cov
+
+# Fuzzing
+/fuzz
+/fuzz/*
+
+# local
+memory-bank

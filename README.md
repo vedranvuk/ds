@@ -4,6 +4,7 @@ Data structures, various.
 
 - bidi - One-to-one, bidirectional generic map of comparable keys.
 - cache - Rotating cache of []byte with a generic key.
+- fs - In-memory file-system.
 - gencache - Rotating cache with comparable keys and any value.
 - graph - Many-to-many, polydirectional map of comparable keys.
 - ordered - Ordered generic map of comparable keys to any value.
