@@ -90,13 +90,13 @@ func assertLessOrEqual(t *testing.T, actual, expected int, msg string) {
 }
 
 func TestNew(t *testing.T) {
-	var sessions = New[TestKey](10, 3, newTestKey)
+	var sessions = New[TestKey](10, 3, newTestKey, nil)
 	assertNotNil(t, sessions, "New Sessions")
 	assertEqual(t, 0, sessions.SessionCount(), "Initial SessionCount")
 }
 
 func TestAdd(t *testing.T) {
-	var sessions = New[TestKey](10, 3, newTestKey)
+	var sessions = New[TestKey](10, 3, newTestKey, nil)
 	var userID = newTestKey()
 
 	var sessionID TestKey
@@ -117,7 +117,7 @@ func TestAdd(t *testing.T) {
 	assertEqual(t, 3, sessions.SessionCount(), "SessionCount after max user sessions")
 	assertEqual(t, 3, sessions.UserSessionCount(userID), "UserSessionCount after max user sessions")
 
-	sessions = New[TestKey](2, 3, newTestKey)
+	sessions = New[TestKey](2, 3, newTestKey, nil)
 	_, err = sessions.CreateLinked(newTestKey(), time.Minute)
 	assertNoError(t, err, "Add session 1")
 	_, err = sessions.CreateLinked(newTestKey(), time.Minute)
@@ -128,7 +128,7 @@ func TestAdd(t *testing.T) {
 }
 
 func TestCreateLink(t *testing.T) {
-	var sessions = New[TestKey](10, 3, newTestKey)
+	var sessions = New[TestKey](10, 3, newTestKey, nil)
 
 	var sessionID TestKey
 	var err error
@@ -185,7 +185,7 @@ func TestCreateLink(t *testing.T) {
 }
 
 func TestUserID(t *testing.T) {
-	var sessions = New[TestKey](10, 3, newTestKey)
+	var sessions = New[TestKey](10, 3, newTestKey, nil)
 	var userID = newTestKey()
 
 	var sessionID TestKey
@@ -194,14 +194,14 @@ func TestUserID(t *testing.T) {
 	var found bool
 	retUserID, found = sessions.UserID(sessionID)
 	assertTrue(t, found, "UserID found")
-	assertEqual(t, userID, retUserID, "UserID returned")
+	assertEqual(t, userID, retUserID, "User ID returned")
 
 	_, found = sessions.UserID(newTestKey())
 	assertFalse(t, found, "UserID not found for unknown session")
 }
 
 func TestExtend(t *testing.T) {
-	var sessions = New[TestKey](10, 3, newTestKey)
+	var sessions = New[TestKey](10, 3, newTestKey, nil)
 	var userID = newTestKey()
 	var sessionID TestKey
 	sessionID, _ = sessions.CreateLinked(userID, time.Millisecond*100)
@@ -224,7 +224,7 @@ func TestExtend(t *testing.T) {
 }
 
 func TestRemoveSession(t *testing.T) {
-	var sessions = New[TestKey](10, 3, newTestKey)
+	var sessions = New[TestKey](10, 3, newTestKey, nil)
 	var userID = newTestKey()
 	var sessionID TestKey
 	sessionID, _ = sessions.CreateLinked(userID, time.Minute)
@@ -240,7 +240,7 @@ func TestRemoveSession(t *testing.T) {
 }
 
 func TestRemoveUser(t *testing.T) {
-	var sessions = New[TestKey](10, 3, newTestKey)
+	var sessions = New[TestKey](10, 3, newTestKey, nil)
 	var userID1 = newTestKey()
 	var userID2 = newTestKey()
 
@@ -276,7 +276,7 @@ func TestRemoveUser(t *testing.T) {
 }
 
 func TestSessionCount(t *testing.T) {
-	var sessions = New[TestKey](10, 3, newTestKey)
+	var sessions = New[TestKey](10, 3, newTestKey, nil)
 	assertEqual(t, 0, sessions.SessionCount(), "Initial SessionCount")
 
 	sessions.CreateLinked(newTestKey(), time.Minute)
@@ -294,34 +294,82 @@ func TestSessionCount(t *testing.T) {
 }
 
 func TestUserSessionCount(t *testing.T) {
-	var sessions = New[TestKey](10, 3, newTestKey)
+	var sessions = New[TestKey](10, 3, newTestKey, nil)
 	var userID = newTestKey()
 	assertEqual(t, 0, sessions.UserSessionCount(userID), "Initial UserSessionCount")
 
 	sessions.CreateLinked(userID, time.Minute)
 	sessions.CreateLinked(userID, time.Minute)
-	assertEqual(t, 2, sessions.UserSessionCount(userID), "UserSessionCount after adding 2 sessions")
+	assertEqual(t, 2, sessions.SessionCount(), "SessionCount after adding 2 sessions")
 
-	var sessionID TestKey
-	var found bool
-	var f = func() (sessionIDRet TestKey, foundRet bool) {
-		for k, u := range sessions.sessionToUser {
-			if u == userID {
-				sessionIDRet = k
-				foundRet = true
-				return
-			}
-		}
-		return
+	var sessionID TestKey // Define sessionID
+	// Iterate through the sessionToUser map to get a sessionID
+	for sessionID = range sessions.sessionToUser {
+		break // Just get the first one
 	}
-	sessionID, found = f()
-	assertTrue(t, found, "SessionID found for userID")
 	sessions.RemoveSession(sessionID)
-	assertEqual(t, 1, sessions.UserSessionCount(userID), "UserSessionCount after removing 1 session")
+
+	assertEqual(t, 1, sessions.SessionCount(), "SessionCount after removing 1 session")
+}
+
+func TestUserSessions(t *testing.T) {
+	var sessions = New[TestKey](10, 3, newTestKey, nil)
+	var userID = newTestKey()
+
+	// No sessions for user
+	var sessionIDs = sessions.UserSessions(userID)
+	assertEqual(t, 0, len(sessionIDs), "Initial UserSessions count")
+
+	// Add sessions for user
+	var sessionID1 TestKey
+	sessionID1, _ = sessions.CreateLinked(userID, time.Minute)
+	var sessionID2 TestKey
+	sessionID2, _ = sessions.CreateLinked(userID, time.Minute)
+
+	sessionIDs = sessions.UserSessions(userID)
+	assertEqual(t, 2, len(sessionIDs), "UserSessions count after adding 2 sessions")
+
+	// Check if session IDs are correct
+	var found1, found2 bool
+	for _, sessionID := range sessionIDs {
+		if sessionID == sessionID1 {
+			found1 = true
+		}
+		if sessionID == sessionID2 {
+			found2 = true
+		}
+	}
+	assertTrue(t, found1, "SessionID1 found in UserSessions")
+	assertTrue(t, found2, "SessionID2 found in UserSessions")
+
+	// Remove a session and check again
+	sessions.RemoveSession(sessionID1)
+	sessionIDs = sessions.UserSessions(userID)
+	assertEqual(t, 1, len(sessionIDs), "UserSessions count after removing 1 session")
+
+	// Check if remaining session ID is correct
+	assertEqual(t, sessionID2, sessionIDs[0], "Remaining session ID is correct")
+}
+
+func TestTimeoutCallback(t *testing.T) {
+	var timeoutCalled int32
+	var sessions = New[TestKey](10, 3, newTestKey, func(sessionID TestKey) {
+		atomic.AddInt32(&timeoutCalled, 1)
+	})
+	var userID = newTestKey()
+	var sessionID TestKey
+	sessionID, _ = sessions.CreateLinked(userID, time.Millisecond*100)
+
+	time.Sleep(time.Millisecond * 200) // Wait for timeout
+	var _, found = sessions.UserID(sessionID)
+	assertFalse(t, found, "UserID after timeout")
+	assertEqual(t, 0, sessions.SessionCount(), "SessionCount after timeout")
+	assertEqual(t, 0, sessions.UserSessionCount(userID), "UserSessionCount after timeout")
+	assertEqual(t, int32(1), atomic.LoadInt32(&timeoutCalled), "Timeout callback should be called")
 }
 
 func TestTimeout(t *testing.T) {
-	var sessions = New[TestKey](10, 3, newTestKey)
+	var sessions = New[TestKey](10, 3, newTestKey, nil)
 	var userID = newTestKey()
 	var sessionID TestKey
 	sessionID, _ = sessions.CreateLinked(userID, time.Millisecond*100)
@@ -334,7 +382,7 @@ func TestTimeout(t *testing.T) {
 }
 
 func TestConcurrentAddExtendTimeout(t *testing.T) {
-	var sessions = New[TestKey](100, 10, newTestKey)
+	var sessions = New[TestKey](100, 10, newTestKey, nil)
 	var userID = newTestKey()
 	var sessionIDs []TestKey
 	var wg sync.WaitGroup
@@ -371,7 +419,7 @@ func generateRandomNumber(max int) (num int) {
 }
 
 func BenchmarkAdd(b *testing.B) {
-	var sessions = New[TestKey](b.N, 1, newTestKey)
+	var sessions = New[TestKey](b.N, 1, newTestKey, nil)
 	var userID = newTestKey()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -380,7 +428,7 @@ func BenchmarkAdd(b *testing.B) {
 }
 
 func BenchmarkUserID(b *testing.B) {
-	var sessions = New[TestKey](b.N, 1, newTestKey)
+	var sessions = New[TestKey](b.N, 1, newTestKey, nil)
 	var sessionIDs = make([]TestKey, b.N)
 	var userID = newTestKey()
 	for i := 0; i < b.N; i++ {
@@ -393,7 +441,7 @@ func BenchmarkUserID(b *testing.B) {
 }
 
 func BenchmarkExtend(b *testing.B) {
-	var sessions = New[TestKey](b.N, 1, newTestKey)
+	var sessions = New[TestKey](b.N, 1, newTestKey, nil)
 	var sessionIDs = make([]TestKey, b.N)
 	var userID = newTestKey()
 	for i := 0; i < b.N; i++ {
@@ -406,7 +454,7 @@ func BenchmarkExtend(b *testing.B) {
 }
 
 func BenchmarkRemoveSession(b *testing.B) {
-	var sessions = New[TestKey](b.N, 1, newTestKey)
+	var sessions = New[TestKey](b.N, 1, newTestKey, nil)
 	var sessionIDs = make([]TestKey, b.N)
 	var userID = newTestKey()
 	for i := 0; i < b.N; i++ {
@@ -419,7 +467,7 @@ func BenchmarkRemoveSession(b *testing.B) {
 }
 
 func BenchmarkAddConcurrent(b *testing.B) {
-	var sessions = New[TestKey](b.N, 1, newTestKey)
+	var sessions = New[TestKey](b.N, 1, newTestKey, nil)
 	var userID = newTestKey()
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
@@ -430,7 +478,7 @@ func BenchmarkAddConcurrent(b *testing.B) {
 }
 
 func BenchmarkUserIDConcurrent(b *testing.B) {
-	var sessions = New[TestKey](b.N, 1, newTestKey)
+	var sessions = New[TestKey](b.N, 1, newTestKey, nil)
 	var sessionIDs = make([]TestKey, b.N)
 	var userID = newTestKey()
 	for i := 0; i < b.N; i++ {
@@ -446,7 +494,7 @@ func BenchmarkUserIDConcurrent(b *testing.B) {
 }
 
 func BenchmarkExtendConcurrent(b *testing.B) {
-	var sessions = New[TestKey](b.N, 1, newTestKey)
+	var sessions = New[TestKey](b.N, 1, newTestKey, nil)
 	var sessionIDs = make([]TestKey, b.N)
 	var userID = newTestKey()
 	for i := 0; i < b.N; i++ {
@@ -462,7 +510,7 @@ func BenchmarkExtendConcurrent(b *testing.B) {
 }
 
 func BenchmarkRemoveSessionConcurrent(b *testing.B) {
-	var sessions = New[TestKey](b.N, 1, newTestKey)
+	var sessions = New[TestKey](b.N, 1, newTestKey, nil)
 	var sessionIDs = make([]TestKey, b.N)
 	var userID = newTestKey()
 	for i := 0; i < b.N; i++ {

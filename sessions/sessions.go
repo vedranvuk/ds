@@ -81,6 +81,7 @@ type Map[K comparable] struct {
 	maxSessions        int
 	maxSessionsPerUser int
 	totalCount         int
+	sessionTimeout     func(K)
 }
 
 // New returns a new [Map] instance.
@@ -90,11 +91,12 @@ type Map[K comparable] struct {
 //   - maxSessions: The maximum number of sessions allowed cumulatively.
 //   - maxSessionsPerUser: Limits the number of sessions per user.
 //   - newKey: A function that generates unique session keys.
+//   - sessionTimeout: A function called when a session times out, can be nil.
 //
 // Returns:
 //
 //   - out: A pointer to the newly created [Map] instance.
-func New[K comparable](maxSessions, maxSessionsPerUser int, newKey func() K) (out *Map[K]) {
+func New[K comparable](maxSessions, maxSessionsPerUser int, newKey func() K, sessionTimeout func(sessionID K)) (out *Map[K]) {
 	out = &Map[K]{
 		z:                  *new(K),
 		newKey:             newKey,
@@ -105,6 +107,7 @@ func New[K comparable](maxSessions, maxSessionsPerUser int, newKey func() K) (ou
 		maxSessions:        maxSessions,
 		maxSessionsPerUser: maxSessionsPerUser,
 		totalCount:         0,
+		sessionTimeout:     sessionTimeout,
 	}
 	out.timeouts = ttl.New(out.timeout)
 	return
@@ -308,6 +311,29 @@ func (self *Map[K]) UserSessionCount(userID K) (out int) {
 	return
 }
 
+// UserSessions returns a slice of session IDs for a specific user.
+//
+// Parameters:
+//
+//   - userID: The ID of the user.
+//
+// Returns:
+//
+//   - out: A slice of session IDs for the user.
+func (self *Map[K]) UserSessions(userID K) (out []K) {
+	self.mu.Lock()
+	defer self.mu.Unlock()
+
+	if sessions, exists := self.userToSessions[userID]; exists {
+		out = make([]K, 0, len(sessions))
+		for sessionID := range sessions {
+			out = append(out, sessionID)
+		}
+	}
+
+	return
+}
+
 // extend extends the session under sesionID.
 func (self *Map[K]) extend(sessionID K) (err error) {
 	if duration, exists := self.sessionDurations[sessionID]; exists {
@@ -368,5 +394,8 @@ func (self *Map[K]) timeout(key K) {
 	self.mu.Lock()
 	self.removeSession(key, true)
 	self.mu.Unlock()
+	if self.sessionTimeout != nil {
+		self.sessionTimeout(key)
+	}
 	return
 }
