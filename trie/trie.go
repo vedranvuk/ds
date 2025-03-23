@@ -15,7 +15,7 @@ import (
 
 // Trie implements a prefix tree of generic values keyed by a string key.
 //
-// It has fast lookups and can retrieve keys which are a prefix or suffix of 
+// It has fast lookups and can retrieve keys which are a prefix or suffix of
 // some key.
 //
 // Implemented as a tree of [Node] where each node stores branches in a slice
@@ -40,7 +40,7 @@ func New[V any]() *Trie[V] {
 
 // Put inserts value keyed by key.
 //
-// If an entry under key already exists its value is replaced with value 
+// If an entry under key already exists its value is replaced with value
 // argument and the old value is returned with replaced being true. Otherwise a
 // zero value of V is returned and false.
 //
@@ -204,7 +204,7 @@ restart:
 // happen that no nodes get deleted in case the node that contains the value
 // has child branches of its own.
 //
-// It merges nodes that have single branches along the parent path to avoid 
+// It merges nodes that have single branches along the parent path to avoid
 // fragmentation.
 func (self *Trie[V]) Delete(key string) (value V, deleted bool) {
 	if key == "" {
@@ -302,9 +302,10 @@ func (self *Trie[V]) Exists(key string) (exists bool) {
 
 // Prefixes returns a list of set keys which are a prefix of key.
 // For example, if trie has following keys:
-//  - foo
-//  - foobar
-//  - foobarbaz
+//   - foo
+//   - foobar
+//   - foobarbaz
+//
 // Prefixes then returns ["foo", "foobar"] for key "foobarbaz".
 func (self *Trie[V]) Prefixes(key string) (out []string) {
 
@@ -403,9 +404,10 @@ restart:
 // Suffixes returns a list of set keys which are a suffix of key.
 //
 // For example, if trie has following keys:
-//  - foo
-//  - foobar
-//  - foobarbaz
+//   - foo
+//   - foobar
+//   - foobarbaz
+//
 // suffixes then returns ["foobar", "foobarbaz"] for key "foo".
 func (self *Trie[V]) Suffixes(key string) (out []string) {
 
@@ -533,11 +535,11 @@ func (self *Trie[V]) enum(node *Node[V], prefix string, f func(key string, value
 //
 // It calls the provided function 'f' for each key in the Trie.
 // The enumeration stops if 'f' returns false.
-func (receiver *Trie[V]) EnumKeys(f func(key string) bool) {
-	receiver.enumKeys(receiver.root, "", f)
+func (self *Trie[V]) EnumKeys(f func(key string) bool) {
+	self.enumKeys(self.root, "", f)
 }
 
-func (receiver *Trie[V]) enumKeys(node *Node[V], prefix string, f func(key string) bool) {
+func (self *Trie[V]) enumKeys(node *Node[V], prefix string, f func(key string) bool) {
 	var currentKey string
 	currentKey = prefix + string(node.Prefix)
 
@@ -548,7 +550,7 @@ func (receiver *Trie[V]) enumKeys(node *Node[V], prefix string, f func(key strin
 	}
 
 	for _, child := range node.Branches {
-		receiver.enumKeys(child, currentKey, f)
+		self.enumKeys(child, currentKey, f)
 	}
 }
 
@@ -560,7 +562,7 @@ func (self *Trie[V]) EnumValues(f func(value V) bool) {
 	self.enumValues(self.root, f)
 }
 
-func (receiver *Trie[V]) enumValues(node *Node[V], f func(value V) bool) {
+func (self *Trie[V]) enumValues(node *Node[V], f func(value V) bool) {
 	if node.HasValue {
 		if !f(node.Value) {
 			return
@@ -568,7 +570,7 @@ func (receiver *Trie[V]) enumValues(node *Node[V], f func(value V) bool) {
 	}
 
 	for _, child := range node.Branches {
-		receiver.enumValues(child, f)
+		self.enumValues(child, f)
 	}
 }
 
@@ -725,6 +727,14 @@ func (self *SyncTrie[V]) Suffixes(key string) (out []string) {
 	return
 }
 
+// HasSuffixes returns true if key has any prefixes.
+func (self *SyncTrie[V]) HasSuffixes(key string) (truth bool) {
+	self.mutex.RLock()
+	truth = self.trie.HasSuffixes(key)
+	self.mutex.RUnlock()
+	return
+}
+
 // Print writes self to writer w as a multiline string representing the tree
 // structure.
 //
@@ -733,5 +743,35 @@ func (self *SyncTrie[V]) Suffixes(key string) (out []string) {
 func (self *SyncTrie[V]) Print(w io.Writer) {
 	self.mutex.RLock()
 	self.trie.Print(w)
+	self.mutex.RUnlock()
+}
+
+// Enum enumerates all key-value pairs in the Trie.
+//
+// It calls the provided function 'f' for each key-value pair in the Trie.
+// The enumeration stops if 'f' returns false.
+func (self *SyncTrie[V]) Enum(f func(key string, value V) bool) {
+	self.mutex.RLock()
+	self.trie.Enum(f)
+	self.mutex.RUnlock()
+}
+
+// EnumKeys enumerates all keys in the Trie.
+//
+// It calls the provided function 'f' for each key in the Trie.
+// The enumeration stops if 'f' returns false.
+func (self *SyncTrie[V]) EnumKeys(f func(key string) bool) {
+	self.mutex.RLock()
+	self.trie.EnumKeys(f)
+	self.mutex.RUnlock()
+}
+
+// EnumValues enumerates all values in the Trie.
+//
+// It calls the provided function 'f' for each value in the Trie.
+// The enumeration stops if 'f' returns false.
+func (self *SyncTrie[V]) EnumValues(f func(value V) bool) {
+	self.mutex.RLock()
+	self.trie.EnumValues(f)
 	self.mutex.RUnlock()
 }
