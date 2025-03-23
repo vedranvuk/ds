@@ -397,7 +397,32 @@ func TestTriePrefixesHasPrefixes(t *testing.T) {
 	}
 }
 
-// Here are the test units for the Delete method
+// Model: gpt-4-1106-preview
+func TestTrieSuffixes(t *testing.T) {
+	var tr = New[int]()
+
+	// No suffixes
+	var suffixes []string
+	suffixes = tr.Suffixes("key")
+	if len(suffixes) != 0 {
+		t.Errorf("Suffixes with no suffixes should return empty slice, got %v", suffixes)
+	}
+
+	// Add suffixes
+	tr.Put("foo", 1)
+	tr.Put("foobar", 2)
+	tr.Put("foobarbaz", 3)
+	tr.Put("foobarbazbat", 4)
+
+	// Check suffixes
+	suffixes = tr.Suffixes("foobar")
+	var expectedSuffixes = []string{"foobarbaz", "foobarbazbat"}
+	if !slices.Equal(suffixes, expectedSuffixes) {
+		t.Errorf("Suffixes for 'foobar' should be %v, got %v", expectedSuffixes, suffixes)
+	}
+
+}
+
 // Model: gpt-4-1106-preview
 func TestTrieDeleteMerge(t *testing.T) {
 	var trie = New[int]()
