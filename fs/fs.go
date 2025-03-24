@@ -70,10 +70,6 @@ type FS struct {
 // Returns:
 //
 //   - out: A pointer to the newly created FS instance.
-//
-// Example:
-//
-//	fsys := New()
 func New() (out *FS) {
 	out = &FS{
 		files: trie.New[*File](),
@@ -91,19 +87,6 @@ func New() (out *FS) {
 //
 //   - file: The opened file, or nil if an error occurred.
 //   - err: An error, if any. Returns ErrNotFound if the file does not exist.
-//
-// Example:
-//
-//	fsys := New()
-//	_, err := fsys.Create("myfile.txt")
-//	if err != nil {
-//		panic(err)
-//	}
-//	file, err := fsys.Open("myfile.txt")
-//	if err != nil {
-//		panic(err)
-//	}
-//	defer file.Close()
 func (self *FS) Open(name string) (file fs.File, err error) {
 	var (
 		f      *File
@@ -125,20 +108,6 @@ func (self *FS) Open(name string) (file fs.File, err error) {
 //
 //   - fileInfo: The FileInfo of the file, or nil if an error occurred.
 //   - err: An error, if any. Returns ErrNotFound if the file does not exist.
-//
-// Example:
-//
-//	fsys := New()
-//	_, err := fsys.Create("myfile.txt")
-//	if err != nil {
-//		panic(err)
-//	}
-//	fileInfo, err := fsys.Stat("myfile.txt")
-//	if err != nil {
-//		panic(err)
-//	}
-//	fmt.Println(fileInfo.Name())
-//	// Output: myfile.txt
 func (self *FS) Stat(name string) (fileInfo fs.FileInfo, err error) {
 	var file fs.File
 	if file, err = self.Open(name); err != nil {
@@ -158,20 +127,6 @@ func (self *FS) Stat(name string) (fileInfo fs.FileInfo, err error) {
 //
 //   - data: The contents of the file.
 //   - err: An error, if any. Returns ErrNotFound if the file does not exist.
-//
-// Example:
-//
-//	fsys := New()
-//	err := fsys.WriteFile("myfile.txt", []byte("Hello, world!"), 0644)
-//	if err != nil {
-//		panic(err)
-//	}
-//	data, err := fsys.ReadFile("myfile.txt")
-//	if err != nil {
-//		panic(err)
-//	}
-//	fmt.Println(string(data))
-//	// Output: Hello, world!
 func (self *FS) ReadFile(name string) (data []byte, err error) {
 	var f fs.File
 	if f, err = self.Open(name); err != nil {
@@ -212,20 +167,6 @@ func (self *FS) ReadFile(name string) (data []byte, err error) {
 //
 //   - entries: A list of directory entries.
 //   - err: An error, if any.
-//
-// Example:
-//
-//	fsys := New()
-//	fsys.Mkdir("mydir", 0755)
-//	fsys.WriteFile("mydir/myfile.txt", []byte(""), 0644)
-//	entries, err := fsys.ReadDir("mydir")
-//	if err != nil {
-//		panic(err)
-//	}
-//	for _, entry := range entries {
-//		fmt.Println(entry.Name())
-//	}
-//	// Output: myfile.txt
 func (self *FS) ReadDir(name string) (entries []fs.DirEntry, err error) {
 	if _, exists := self.files.Get(name); !exists {
 		return nil, ErrNotFound
@@ -281,31 +222,13 @@ type dirEntry struct {
 }
 
 // Name returns the name of the file or directory.
-//
-// Example:
-//
-//	de := dirEntry{name: "myfile.txt"}
-//	fmt.Println(de.Name())
-//	// Output: myfile.txt
 func (self *dirEntry) Name() string { return self.name }
 
 // IsDir reports whether the entry describes a directory.
-//
-// Example:
-//
-//	de := dirEntry{isDir: true}
-//	fmt.Println(de.IsDir())
-//	// Output: true
 func (self *dirEntry) IsDir() bool { return self.isDir }
 
 // Type returns the type bits for the entry.
 // The type bits are a subset of the standard FileMode bits.
-//
-// Example:
-//
-//	de := dirEntry{isDir: true}
-//	fmt.Println(de.Type() == fs.ModeDir)
-//	// Output: true
 func (self *dirEntry) Type() fs.FileMode {
 	if self.IsDir() {
 		return fs.ModeDir
@@ -314,16 +237,6 @@ func (self *dirEntry) Type() fs.FileMode {
 }
 
 // Info returns the FileInfo for the file or directory described by the entry.
-//
-// Example:
-//
-//	de := dirEntry{name: "myfile.txt"}
-//	info, err := de.Info()
-//	if err != nil {
-//		panic(err)
-//	}
-//	fmt.Println(info.Name())
-//	// Output:
 func (self *dirEntry) Info() (fileInfo fs.FileInfo, err error) {
 	// This would require a lookup in the FS to get the actual FileInfo.
 	// For simplicity, we return a basic FileInfo here.
@@ -340,16 +253,6 @@ func (self *dirEntry) Info() (fileInfo fs.FileInfo, err error) {
 //
 //   - file: The newly created file.
 //   - err: An error, if any. Returns ErrExist if the file already exists.
-//
-// Example:
-//
-//	fsys := New()
-//	file, err := fsys.Create("myfile.txt")
-//	if err != nil {
-//		panic(err)
-//	}
-//	fmt.Println(file.Name())
-//	// Output: myfile.txt
 func (self *FS) Create(name string) (file fs.File, err error) {
 	_, exists := self.files.Get(name)
 	if exists {
@@ -378,20 +281,6 @@ func (self *FS) Create(name string) (file fs.File, err error) {
 // Returns:
 //
 //   - err: An error, if any. Returns ErrExist if the directory already exists.
-//
-// Example:
-//
-//	fsys := New()
-//	err := fsys.Mkdir("mydir", 0755)
-//	if err != nil {
-//		panic(err)
-//	}
-//	fileInfo, err := fsys.Stat("mydir")
-//	if err != nil {
-//		panic(err)
-//	}
-//	fmt.Println(fileInfo.IsDir())
-//	// Output: true
 func (self *FS) Mkdir(name string, perm fs.FileMode) (err error) {
 	_, exists := self.files.Get(name)
 	if exists {
@@ -420,20 +309,6 @@ func (self *FS) Mkdir(name string, perm fs.FileMode) (err error) {
 // Returns:
 //
 //   - err: An error, if any.
-//
-// Example:
-//
-//	fsys := New()
-//	err := fsys.WriteFile("myfile.txt", []byte("Hello, world!"), 0644)
-//	if err != nil {
-//		panic(err)
-//	}
-//	data, err := fsys.ReadFile("myfile.txt")
-//	if err != nil {
-//		panic(err)
-//	}
-//	fmt.Println(string(data))
-//	// Output: Hello, world!
 func (self *FS) WriteFile(name string, data []byte, perm fs.FileMode) (err error) {
 	var f, exists = self.files.Get(name)
 	if !exists {
@@ -472,11 +347,6 @@ type File struct {
 // Parameters:
 //
 //   - p: The byte slice to write to the file.
-//
-// Returns:
-//
-//   - n: The number of bytes written.
-//   - err: An error, if any.
 func (self *File) Write(p []byte) (n int, err error) {
 	self.data = append(self.data, p...)
 	self.offset += len(p)
@@ -490,11 +360,6 @@ func (self *File) Write(p []byte) (n int, err error) {
 // Parameters:
 //
 //   - w: The io.Writer to write to.
-//
-// Returns:
-//
-//   - n: The number of bytes written.
-//   - err: An error, if any.
 func (self *File) WriteTo(w io.Writer) (n int64, err error) {
 	numBytes, err := w.Write(self.data)
 	return int64(numBytes), err
@@ -509,11 +374,6 @@ func (self *File) WriteTo(w io.Writer) (n int64, err error) {
 //
 //   - offset: the offset to seek to.
 //   - whence: 0: relative to the origin of the file, 1: relative to the current offset, 2: relative to the end.
-//
-// Returns:
-//
-//   - offset: the new offset relative to the origin of the file.
-//   - err: An error, if any.
 func (self *File) Seek(offset int64, whence int) (int64, error) {
 	switch whence {
 	case io.SeekStart:
@@ -545,16 +405,6 @@ func (self *File) Seek(offset int64, whence int) (int64, error) {
 //
 //   - fileInfo: The FileInfo of the file.
 //   - err: An error, if any.
-//
-// Example:
-//
-//	f := &File{name: "myfile.txt"}
-//	fileInfo, err := f.Stat()
-//	if err != nil {
-//		panic(err)
-//	}
-//	fmt.Println(fileInfo.Name())
-//	// Output: myfile.txt
 func (self *File) Stat() (fileInfo fs.FileInfo, err error) { return self, nil }
 
 // Read reads up to len(b) bytes from the File.
@@ -569,17 +419,6 @@ func (self *File) Stat() (fileInfo fs.FileInfo, err error) { return self, nil }
 //
 //   - n: The number of bytes read.
 //   - err: An error, if any. Returns io.EOF if the end of the file is reached.
-//
-// Example:
-//
-//	f := &File{data: []byte("Hello, world!")}
-//	b := make([]byte, 5)
-//	n, err := f.Read(b)
-//	if err != nil && err.Error() != "EOF" {
-//		panic(err)
-//	}
-//	fmt.Println(string(b[:n]))
-//	// Output: Hello
 func (self *File) Read(b []byte) (n int, err error) {
 	if self.offset >= len(self.data) {
 		return 0, io.EOF
@@ -600,14 +439,6 @@ func (self *File) Read(b []byte) (n int, err error) {
 // Returns:
 //
 //   - err: An error, if any.
-//
-// Example:
-//
-//	f := &File{}
-//	err := f.Close()
-//	if err != nil {
-//		panic(err)
-//	}
 func (self *File) Close() (err error) {
 	self.offset = 0
 	return nil
@@ -618,12 +449,6 @@ func (self *File) Close() (err error) {
 // Returns:
 //
 //   - name: The name of the file.
-//
-// Example:
-//
-//	f := &File{name: "myfile.txt"}
-//	fmt.Println(f.Name())
-//	// Output: myfile.txt
 func (self *File) Name() string { return self.name }
 
 // Size returns the length in bytes for regular files; other files may return different values.
@@ -631,12 +456,6 @@ func (self *File) Name() string { return self.name }
 // Returns:
 //
 //   - size: The length in bytes for regular files.
-//
-// Example:
-//
-//	f := &File{data: []byte("Hello")}
-//	fmt.Println(f.Size())
-//	// Output: 5
 func (self *File) Size() int64 { return int64(len(self.data)) }
 
 // Mode returns file mode bits.
@@ -644,12 +463,6 @@ func (self *File) Size() int64 { return int64(len(self.data)) }
 // Returns:
 //
 //   - mode: The file mode bits.
-//
-// Example:
-//
-//	f := &File{mode: 0644}
-//	fmt.Printf("%o\n", f.Mode())
-//	// Output: 644
 func (self *File) Mode() fs.FileMode { return self.mode }
 
 // ModTime returns the modification time.
@@ -657,13 +470,6 @@ func (self *File) Mode() fs.FileMode { return self.mode }
 // Returns:
 //
 //   - modTime: The modification time.
-//
-// Example:
-//
-//	now := time.Now()
-//	f := &File{modTime: now}
-//	fmt.Println(f.ModTime().Format(time.RFC3339))
-//	// Output: 2024-10-27T10:00:00+00:00 (example output, time will vary)
 func (self *File) ModTime() time.Time { return self.modTime }
 
 // IsDir reports whether the file is a directory.
@@ -671,12 +477,6 @@ func (self *File) ModTime() time.Time { return self.modTime }
 // Returns:
 //
 //   - isDir: True if the file is a directory, false otherwise.
-//
-// Example:
-//
-//	f := &File{mode: fs.ModeDir}
-//	fmt.Println(f.IsDir())
-//	// Output: true
 func (self *File) IsDir() bool { return self.mode.IsDir() }
 
 // Sys is designed to return the underlying data source.
