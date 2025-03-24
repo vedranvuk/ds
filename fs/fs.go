@@ -184,6 +184,10 @@ func (self *FS) ReadFile(name string) (data []byte, err error) {
 	}
 	defer file.Close()
 
+	if len(file.data) == 0 {
+		return []byte{}, nil
+	}
+
 	data = make([]byte, len(file.data))
 	var n int
 	if n, err = file.Read(data); err != nil {
@@ -223,40 +227,45 @@ func (self *FS) ReadFile(name string) (data []byte, err error) {
 //	}
 //	// Output: myfile.txt
 func (self *FS) ReadDir(name string) (entries []fs.DirEntry, err error) {
+	if _, exists := self.files.Get(name); !exists {
+		return nil, ErrNotFound
+	}
+
 	var result []fs.DirEntry
 
 	self.files.Enum(func(key string, value *File) bool {
-		dir := filepath.Dir(key)
+		var dir = filepath.Dir(key)
 
 		if name == "." {
 			if !strings.Contains(key, "/") {
 				result = append(result, &dirEntry{name: key, isDir: value.mode.IsDir()})
 			}
 		} else if dir == name {
-			base := filepath.Base(key)
+			var base = filepath.Base(key)
 			result = append(result, &dirEntry{name: base, isDir: value.mode.IsDir()})
 		} else if strings.HasPrefix(key, name+"/") {
 			rel, err := filepath.Rel(name, key)
 			if err != nil {
 				return true
 			}
-			parts := strings.Split(rel, "/")
-			if len(parts) > 0 {
-				firstPart := parts[0]
-				alreadyAdded := false
-				for _, entry := range result {
-					if entry.Name() == firstPart {
-						alreadyAdded = true
-						break
-					}
+			var parts = strings.Split(rel, "/")
+			if len(parts) < 0 {
+				return true
+			}
+			var firstPart = parts[0]
+			var alreadyAdded = false
+			for _, entry := range result {
+				if entry.Name() == firstPart {
+					alreadyAdded = true
+					break
 				}
-				if !alreadyAdded {
-					var isDir bool
-					if f, ok := self.files.Get(filepath.Join(name, firstPart)); ok {
-						isDir = f.mode.IsDir()
-					}
-					result = append(result, &dirEntry{name: firstPart, isDir: isDir})
+			}
+			if !alreadyAdded {
+				var isDir bool
+				if f, ok := self.files.Get(filepath.Join(name, firstPart)); ok {
+					isDir = f.mode.IsDir()
 				}
+				result = append(result, &dirEntry{name: firstPart, isDir: isDir})
 			}
 		}
 		return true
@@ -455,6 +464,79 @@ type File struct {
 	data    []byte
 	offset  int
 	modTime time.Time
+}
+
+// Write reads up to len(p) bytes from the File and appends it to the data.
+// It returns the number of bytes read and an error, if any.
+//
+// Parameters:
+//
+//   - p: The byte slice to write to the file.
+//
+// Returns:
+//
+//   - n: The number of bytes written.
+//   - err: An error, if any.
+func (self *File) Write(p []byte) (n int, err error) {
+	self.data = append(self.data, p...)
+	self.offset += len(p)
+	return len(p), nil
+}
+
+// WriteTo writes data to w until there's no more data to write or when an error occurs.
+// The return value is the number of bytes written.
+// Any error encountered during the write is also returned.
+//
+// Parameters:
+//
+//   - w: The io.Writer to write to.
+//
+// Returns:
+//
+//   - n: The number of bytes written.
+//   - err: An error, if any.
+func (self *File) WriteTo(w io.Writer) (n int64, err error) {
+	numBytes, err := w.Write(self.data)
+	return int64(numBytes), err
+}
+
+// Seek sets the offset for the next Read or Write to offset, interpreted
+// according to whence: 0 means relative to the origin of the file, 1 means
+// relative to the current offset, and 2 means relative to the end.
+// Seek returns the new offset relative to the origin of the file and an error, if any.
+//
+// Parameters:
+//
+//   - offset: the offset to seek to.
+//   - whence: 0: relative to the origin of the file, 1: relative to the current offset, 2: relative to the end.
+//
+// Returns:
+//
+//   - offset: the new offset relative to the origin of the file.
+//   - err: An error, if any.
+func (self *File) Seek(offset int64, whence int) (int64, error) {
+	switch whence {
+	case io.SeekStart:
+		self.offset = int(offset)
+	case io.SeekCurrent:
+		self.offset += int(offset)
+	case io.SeekEnd:
+		self.offset = len(self.data) + int(offset)
+	default:
+		return 0, errors.New("invalid whence")
+	}
+
+	if self.offset < 0 {
+		self.offset = 0
+		return 0, errors.New("negative position")
+	}
+
+	if self.offset < 0 {
+		self.offset = 0
+		return 0, errors.New("negative position")
+	}
+
+	return int64(self.offset), nil
 }
 
 // Stat returns a FileInfo describing the file.
