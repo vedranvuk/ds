@@ -198,7 +198,7 @@ var ErrNotFound = errors.New("not found")
 //	if err != nil {
 //		fmt.Println("Error deleting key:", err)
 //	}
-func (self *TTL[K]) Delete(key K) (err error) {
+func (self *TTL[K]) Delete(key K) error {
 	if !self.running.Load() {
 		return ErrNotRunning
 	}
@@ -206,8 +206,7 @@ func (self *TTL[K]) Delete(key K) (err error) {
 	delete(self.keys, key)
 	self.queuemu.Unlock()
 	self.delTimeout <- key
-	err = <-self.errchan
-	return
+	return <-self.errchan
 }
 
 // Stop stops the worker. This method should be called on shutdown.

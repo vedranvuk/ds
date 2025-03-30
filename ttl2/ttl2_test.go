@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT
 // license that can be found in the LICENSE file.
 
-package ttl
+package ttl2
 
 import (
 	"fmt"
@@ -15,11 +15,12 @@ import (
 
 func TestLatency(t *testing.T) {
 
+	var cDone = make(chan struct{})
 	var arrivedAt time.Time
 	list := New(func(key int) {
 		arrivedAt = time.Now()
+		close(cDone)
 	})
-	defer list.Stop()
 
 	expectedAt := time.Now().Add(1 * time.Second)
 	var err error
@@ -29,6 +30,7 @@ func TestLatency(t *testing.T) {
 	}
 
 	<-list.Wait()
+	<-cDone
 	if arrivedAt.Sub(expectedAt) > 100*time.Millisecond {
 		t.Fatalf("list is too late: %v", arrivedAt.Sub(expectedAt))
 	}
@@ -36,7 +38,7 @@ func TestLatency(t *testing.T) {
 
 func TestLen(t *testing.T) {
 	list := New[int](func(key int) {})
-	defer list.Stop()
+
 	var err error
 	err = list.Put(1, 1*time.Hour)
 	if err != nil {
@@ -97,13 +99,6 @@ func TestPut(t *testing.T) {
 		t.Fatal(err)
 	}
 	<-list.Wait()
-
-	list.Stop()
-
-	err = list.Put(42, 1*time.Second)
-	if err != ErrNotRunning {
-		t.Fatal("expected ErrNotRunning")
-	}
 }
 
 func TestDelete(t *testing.T) {
@@ -121,14 +116,6 @@ func TestDelete(t *testing.T) {
 	err = list.Delete(69)
 	if err != ErrNotFound {
 		t.Fatal("expected ErrNotFound")
-	}
-	err = list.Stop()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = list.Delete(42)
-	if err != ErrNotRunning {
-		t.Fatal("expected ErrNotRunning")
 	}
 }
 
@@ -172,7 +159,7 @@ func TestRandom(t *testing.T) {
 	list := New[int](func(key int) {
 		wg.Done()
 	})
-	defer list.Stop()
+
 	keys := rand.Perm(numLoops)
 	wg.Add(numLoops)
 	var err error
@@ -224,7 +211,6 @@ func BenchmarkPutRandom(b *testing.B) {
 
 func TestEmptyTTL(t *testing.T) {
 	list := New[int](func(key int) {})
-	defer list.Stop()
 
 	waitChan := list.Wait()
 	select {
@@ -236,7 +222,6 @@ func TestEmptyTTL(t *testing.T) {
 
 func TestOverwrite(t *testing.T) {
 	list := New[int](func(key int) {})
-	defer list.Stop()
 
 	var err error
 	err = list.Put(1, 100*time.Millisecond)
@@ -263,7 +248,6 @@ func TestOverwrite(t *testing.T) {
 
 func TestDeleteNonExistent(t *testing.T) {
 	list := New[int](func(key int) {})
-	defer list.Stop()
 
 	var err error
 	err = list.Delete(1)
@@ -274,7 +258,6 @@ func TestDeleteNonExistent(t *testing.T) {
 
 func TestConcurrentPutDelete(t *testing.T) {
 	list := New[int](func(key int) {})
-	defer list.Stop()
 
 	var wg sync.WaitGroup
 	numOps := 100
@@ -305,7 +288,6 @@ func TestConcurrentPutDelete(t *testing.T) {
 
 func TestMultipleWaiters(t *testing.T) {
 	list := New[int](func(key int) {})
-	defer list.Stop()
 
 	numWaiters := 5
 	waitChans := make([]chan time.Time, numWaiters)
@@ -326,7 +308,6 @@ func TestMultipleWaiters(t *testing.T) {
 
 func TestZeroDuration(t *testing.T) {
 	list := New[int](func(key int) {})
-	defer list.Stop()
 
 	var err error
 	err = list.Put(1, 0*time.Second)
@@ -342,7 +323,6 @@ func TestZeroDuration(t *testing.T) {
 
 func TestNegativeDuration(t *testing.T) {
 	list := New[int](func(key int) {})
-	defer list.Stop()
 
 	var err error
 	err = list.Put(1, -1*time.Second)
@@ -358,7 +338,6 @@ func TestNegativeDuration(t *testing.T) {
 
 func TestNilCallback(t *testing.T) {
 	list := New[int](nil)
-	defer list.Stop()
 
 	var err error
 	err = list.Put(1, 10*time.Millisecond)
@@ -368,58 +347,6 @@ func TestNilCallback(t *testing.T) {
 	<-time.After(50 * time.Millisecond)
 	if list.Len() != 0 {
 		t.Fatal("Key should have expired")
-	}
-}
-
-func TestAddAfterStop(t *testing.T) {
-	list := New[int](nil)
-	err := list.Stop()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = list.Put(1, time.Second)
-	if err != ErrNotRunning {
-		t.Fatal("Expected ErrNotRunning on Put after Stop")
-	}
-}
-
-func TestDeleteAfterStop(t *testing.T) {
-	list := New[int](nil)
-	err := list.Stop()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = list.Delete(1)
-	if err != ErrNotRunning {
-		t.Fatal("Expected ErrNotRunning on Delete after Stop")
-	}
-}
-
-func TestNewAndStop(t *testing.T) {
-	var ttl *TTL[string]
-	ttl = New[string](nil)
-	defer func() {
-		if err := ttl.Stop(); err != ErrNotRunning {
-			t.Fatalf("Failed to stop TTL: %v", err)
-		}
-	}()
-
-	if !ttl.running.Load() {
-		t.Error("TTL should be running after New()")
-	}
-
-	err := ttl.Stop()
-	if err != nil {
-		t.Fatalf("Stop returned an error: %v", err)
-	}
-
-	if ttl.running.Load() {
-		t.Error("TTL should not be running after Stop()")
-	}
-
-	err = ttl.Stop()
-	if err != ErrNotRunning {
-		t.Errorf("Second Stop should return ErrNotRunning, got: %v", err)
 	}
 }
 
@@ -433,11 +360,6 @@ func TestPut_reset(t *testing.T) {
 		err    error
 	)
 	ttl = New[string](nil)
-	defer func() {
-		if err = ttl.Stop(); err != nil {
-			t.Fatalf("Failed to stop TTL: %v", err)
-		}
-	}()
 
 	err = ttl.Put(key, dur1)
 	if err != nil {
@@ -468,8 +390,8 @@ func TestPut_reset(t *testing.T) {
 
 func TestCallback(t *testing.T) {
 	var (
-		key     = "testKey"
-		dur     = 100 * time.Millisecond
+		key      = "testKey"
+		dur      = 100 * time.Millisecond
 		cbCalled atomic.Bool
 		err      error
 		wg       sync.WaitGroup
@@ -483,12 +405,6 @@ func TestCallback(t *testing.T) {
 			wg.Done()
 		}
 	})
-
-	defer func() {
-		if err = ttl.Stop(); err != nil {
-			t.Fatalf("Failed to stop TTL: %v", err)
-		}
-	}()
 
 	err = ttl.Put(key, dur)
 	if err != nil {
@@ -511,11 +427,6 @@ func TestWait(t *testing.T) {
 	)
 
 	ttl = New[string](nil)
-	defer func() {
-		if err = ttl.Stop(); err != nil {
-			t.Fatalf("Failed to stop TTL: %v", err)
-		}
-	}()
 
 	wg.Add(1)
 	go func() {
@@ -538,20 +449,14 @@ func TestWait(t *testing.T) {
 
 func TestConcurrentAccess(t *testing.T) {
 	var (
-		ttl       *TTL[int]
+		ttl         *TTL[int]
 		numRoutines = 100
 		numOps      = 1000
 		dur         = 10 * time.Millisecond
 		wg          sync.WaitGroup
-		err         error
 	)
 
 	ttl = New[int](nil)
-	defer func() {
-		if err = ttl.Stop(); err != nil {
-			t.Fatalf("Failed to stop TTL: %v", err)
-		}
-	}()
 
 	wg.Add(numRoutines)
 	for i := 0; i < numRoutines; i++ {
@@ -563,14 +468,14 @@ func TestConcurrentAccess(t *testing.T) {
 				switch rand.IntN(4) {
 				case 0:
 					err = ttl.Put(key, dur)
-					if err != nil && err != ErrNotRunning {
+					if err != nil {
 						t.Errorf("Routine %d: Put returned an error: %v", routineID, err)
 					}
 				case 1:
 					ttl.Exists(key)
 				case 2:
 					err = ttl.Delete(key)
-					if err != nil && err != ErrNotRunning && err != ErrNotFound {
+					if err != nil && err != ErrNotFound {
 						t.Errorf("Routine %d: Delete returned an error: %v", routineID, err)
 					}
 				case 3:
@@ -584,9 +489,9 @@ func TestConcurrentAccess(t *testing.T) {
 
 func TestEarlyTimeout(t *testing.T) {
 	var (
-		ttl *TTL[string]
-		key = "testKey"
-		dur = -100 * time.Millisecond // Expired before Put
+		ttl      *TTL[string]
+		key      = "testKey"
+		dur      = -100 * time.Millisecond // Expired before Put
 		cbCalled atomic.Bool
 		wg       sync.WaitGroup
 		err      error
@@ -599,11 +504,6 @@ func TestEarlyTimeout(t *testing.T) {
 			wg.Done()
 		}
 	})
-	defer func() {
-		if err = ttl.Stop(); err != nil {
-			t.Fatalf("Failed to stop TTL: %v", err)
-		}
-	}()
 
 	err = ttl.Put(key, dur)
 	if err != nil {
@@ -636,11 +536,6 @@ func TestMultipleTimeouts(t *testing.T) {
 		callbacks[key].Store(true)
 		wg.Done()
 	})
-	defer func() {
-		if err = ttl.Stop(); err != nil {
-			t.Fatalf("Failed to stop TTL: %v", err)
-		}
-	}()
 
 	for i := 0; i < numKeys; i++ {
 		err = ttl.Put(i, dur)
@@ -671,11 +566,6 @@ func TestDeleteBeforeTimeout(t *testing.T) {
 	)
 
 	ttl = New[string](nil)
-	defer func() {
-		if err = ttl.Stop(); err != nil {
-			t.Fatalf("Failed to stop TTL: %v", err)
-		}
-	}()
 
 	err = ttl.Put(key, dur)
 	if err != nil {
@@ -699,28 +589,6 @@ func TestDeleteBeforeTimeout(t *testing.T) {
 	// Check that callback was not called (if any)
 }
 
-func TestWait_empty(t *testing.T) {
-	var (
-		ttl *TTL[string]
-		err error
-	)
-
-	ttl = New[string](nil)
-	defer func() {
-		if err = ttl.Stop(); err != nil {
-			t.Fatalf("Failed to stop TTL: %v", err)
-		}
-	}()
-
-	c := ttl.Wait()
-	select {
-	case <-c:
-		// ok
-	case <-time.After(10 * time.Millisecond):
-		t.Fatal("Wait channel should have been immediately closed")
-	}
-}
-
 func TestWaitMultiple(t *testing.T) {
 	var (
 		ttl *TTL[string]
@@ -730,11 +598,6 @@ func TestWaitMultiple(t *testing.T) {
 	)
 
 	ttl = New[string](nil)
-	defer func() {
-		if err = ttl.Stop(); err != nil {
-			t.Fatalf("Failed to stop TTL: %v", err)
-		}
-	}()
 
 	numWaiters := 5
 	wg.Add(numWaiters)
@@ -759,43 +622,54 @@ func TestWaitMultiple(t *testing.T) {
 	wg.Wait()
 }
 
-func TestDelete_notRunning(t *testing.T) {
+func TestWaitRace(t *testing.T) {
 	var (
-		ttl *TTL[string]
-		err error
+		ttl         *TTL[int]
+		numRoutines = 10
+		dur         = 10 * time.Millisecond
+		wg          sync.WaitGroup
+		waitDone    = make(chan bool)
 	)
-	ttl = New[string](nil)
 
-	err = ttl.Stop()
-	if err != nil {
-		t.Fatalf("Stop returned an error: %v", err)
+	ttl = New[int](nil)
+
+	// Start a goroutine that waits on the TTL
+	go func() {
+		defer close(waitDone)
+		c := ttl.Wait()
+		<-c
+	}()
+
+	// Add and delete keys concurrently
+	for i := 0; i < numRoutines; i++ {
+		wg.Add(1)
+		go func(key int) {
+			defer wg.Done()
+			var err error
+			err = ttl.Put(key, dur)
+			if err != nil {
+				t.Errorf("Put returned an error: %v", err)
+			}
+			time.Sleep(time.Duration(rand.IntN(5)) * time.Millisecond)
+			err = ttl.Delete(key)
+			if err != nil && err != ErrNotFound {
+				t.Errorf("Delete returned an error: %v", err)
+			}
+		}(i)
 	}
 
-	err = ttl.Delete("key")
-	if err != ErrNotRunning {
-		t.Fatalf("Expected ErrNotRunning, got: %v", err)
+	wg.Wait()
+
+	// Wait for the Wait goroutine to finish
+	select {
+	case <-waitDone:
+		// OK
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("Wait did not return after all keys were added and deleted")
 	}
 }
 
-func TestPut_notRunning(t *testing.T) {
-	var (
-		ttl *TTL[string]
-		err error
-	)
-	ttl = New[string](nil)
-
-	err = ttl.Stop()
-	if err != nil {
-		t.Fatalf("Stop returned an error: %v", err)
-	}
-
-	err = ttl.Put("key", time.Second)
-	if err != ErrNotRunning {
-		t.Fatalf("Expected ErrNotRunning, got: %v", err)
-	}
-}
-
-func TestInsertTimeout_duplicates(t *testing.T) {
+func TestWait_empty(t *testing.T) {
 	var (
 		ttl *TTL[string]
 		dur = 100 * time.Millisecond
@@ -804,11 +678,6 @@ func TestInsertTimeout_duplicates(t *testing.T) {
 	)
 
 	ttl = New[string](nil)
-	defer func() {
-		if err = ttl.Stop(); err != nil {
-			t.Fatalf("Failed to stop TTL: %v", err)
-		}
-	}()
 
 	// Add the same key multiple times with different timeouts.
 	err = ttl.Put(key, dur*1)
@@ -839,7 +708,7 @@ func TestInsertTimeout_duplicates(t *testing.T) {
 
 func BenchmarkLen(b *testing.B) {
 	list := New[int](func(key int) {})
-	defer list.Stop()
+
 	var err error
 	for i := 0; i < 100; i++ {
 		err = list.Put(i, time.Hour)
@@ -855,7 +724,7 @@ func BenchmarkLen(b *testing.B) {
 
 func BenchmarkDelete(b *testing.B) {
 	list := New[int](func(key int) {})
-	defer list.Stop()
+
 	var err error
 	for i := 0; i < b.N; i++ {
 		err = list.Put(i, time.Hour)
@@ -874,7 +743,6 @@ func BenchmarkDelete(b *testing.B) {
 
 func BenchmarkWait(b *testing.B) {
 	list := New[int](func(key int) {})
-	defer list.Stop()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -884,7 +752,7 @@ func BenchmarkWait(b *testing.B) {
 
 func TestExists(t *testing.T) {
 	list := New[int](func(key int) {})
-	defer list.Stop()
+
 	var err error
 
 	// Test key exists after put
@@ -925,7 +793,7 @@ func TestExists(t *testing.T) {
 
 func BenchmarkExists(b *testing.B) {
 	list := New[int](func(key int) {})
-	defer list.Stop()
+
 	var err error
 	for i := 0; i < b.N; i++ {
 		err = list.Put(i, time.Hour)
@@ -946,11 +814,6 @@ func BenchmarkPut(b *testing.B) {
 	)
 
 	ttl = New[int](nil)
-	defer func() {
-		if err = ttl.Stop(); err != nil {
-			b.Fatalf("Failed to stop TTL: %v", err)
-		}
-	}()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -971,11 +834,6 @@ func BenchmarkConcurrentPut(b *testing.B) {
 	)
 
 	ttl = New[int](nil)
-	defer func() {
-		if err = ttl.Stop(); err != nil {
-			b.Fatalf("Failed to stop TTL: %v", err)
-		}
-	}()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -983,7 +841,6 @@ func BenchmarkConcurrentPut(b *testing.B) {
 		for j := 0; j < numRoutines; j++ {
 			go func(key int) {
 				defer wg.Done()
-				var err error
 				err = ttl.Put(key, dur)
 				if err != nil {
 					fmt.Printf("Put returned an error: %v", err)
