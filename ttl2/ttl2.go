@@ -292,7 +292,6 @@ loop:
 			}
 		}
 	}
-	return
 }
 
 // tick is called on timer tick. It removes currently waited on key and calls
