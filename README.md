@@ -10,6 +10,7 @@ Data structures, various.
 - ordered - Ordered generic map of comparable keys to any value.
 - queue - Generic queue of any type of value.
 - sessions - Generic map of comparable keys to many comparable values with timeout. Intended for in memory session management.
+- stack - generic stack.
 - trie - a string generic prefix tree.
 - ttl - Time-To-Live list of generic keys.
 
