@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package ordered implements generic ordered map.
-package ordered
+package maps
 
 import (
 	"sync"
