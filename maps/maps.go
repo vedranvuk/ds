@@ -9,7 +9,7 @@ import (
 	"sync"
 )
 
-// Map is a generic ordered map which supports comparable keys
+// OrderedMap is a generic ordered map which supports comparable keys
 // and any type of value.  It maintains the order in which keys were
 // inserted.
 //
@@ -21,7 +21,7 @@ import (
 //	m.Put("three", 3)
 //	fmt.Println(m.Keys())   // Output: [one two three]
 //	fmt.Println(m.Values()) // Output: [1 2 3]
-type Map[K comparable, V any] struct {
+type OrderedMap[K comparable, V any] struct {
 	z        V              // zero value of type V, used for return when not found
 	indexMap map[K]int      // key -> index lookup
 	valueMap map[K]V      // key -> value lookup
@@ -33,8 +33,8 @@ type Map[K comparable, V any] struct {
 // Example:
 //
 //	m := NewOrderedMap[string, int]()
-func NewOrderedMap[K comparable, V any]() *Map[K, V] {
-	return &Map[K, V]{
+func NewOrderedMap[K comparable, V any]() *OrderedMap[K, V] {
+	return &OrderedMap[K, V]{
 		z:        *new(V),
 		indexMap: make(map[K]int),
 		valueMap: make(map[K]V),
@@ -50,7 +50,7 @@ func NewOrderedMap[K comparable, V any]() *Map[K, V] {
 //	m.Put("one", 1)
 //	m.Put("two", 2)
 //	fmt.Println(m.Len()) // Output: 2
-func (self *Map[K, V]) Len() (length int) {
+func (self *OrderedMap[K, V]) Len() (length int) {
 	length = len(self.valueMap)
 	return
 }
@@ -63,7 +63,7 @@ func (self *Map[K, V]) Len() (length int) {
 //	m.Put("one", 1)
 //	fmt.Println(m.Exists("one"))   // Output: true
 //	fmt.Println(m.Exists("three")) // Output: false
-func (self *Map[K, V]) Exists(key K) (exists bool) {
+func (self *OrderedMap[K, V]) Exists(key K) (exists bool) {
 	_, exists = self.valueMap[key]
 	return
 }
@@ -80,7 +80,7 @@ func (self *Map[K, V]) Exists(key K) (exists bool) {
 //	fmt.Println(v, b)     // Output: 1 true
 //	v, b = m.Get("three")
 //	fmt.Println(v, b)     // Output: 0 false
-func (self *Map[K, V]) Get(key K) (value V, exists bool) {
+func (self *OrderedMap[K, V]) Get(key K) (value V, exists bool) {
 	value, exists = self.valueMap[key]
 	return
 }
@@ -98,7 +98,7 @@ func (self *Map[K, V]) Get(key K) (value V, exists bool) {
 //	fmt.Println(v, b)     // Output: 1 true
 //	v, b = m.GetAt(2)
 //	fmt.Println(v, b)     // Output: 0 false
-func (self *Map[K, V]) GetAt(index int) (value V, exists bool) {
+func (self *OrderedMap[K, V]) GetAt(index int) (value V, exists bool) {
 	if index < 0 || index >= len(self.keySlice) {
 		return self.z, false
 	}
@@ -116,7 +116,7 @@ func (self *Map[K, V]) GetAt(index int) (value V, exists bool) {
 //	fmt.Println(old, found) // Output: 0 false
 //	old, found = m.Put("one", 11)
 //	fmt.Println(old, found) // Output: 1 true
-func (self *Map[K, V]) Put(key K, value V) (oldValue V, replaced bool) {
+func (self *OrderedMap[K, V]) Put(key K, value V) (oldValue V, replaced bool) {
 	if oldValue, replaced = self.valueMap[key]; replaced {
 		self.valueMap[key] = value
 		return
@@ -139,7 +139,7 @@ func (self *Map[K, V]) Put(key K, value V) (oldValue V, replaced bool) {
 //	fmt.Println(v, b)     // Output: 1 true
 //	v, b = m.Delete("one")
 //	fmt.Println(v, b)     // Output: 0 false
-func (self *Map[K, V]) Delete(key K) (value V, exists bool) {
+func (self *OrderedMap[K, V]) Delete(key K) (value V, exists bool) {
 	if value, exists = self.valueMap[key]; !exists {
 		return self.z, false
 	}
@@ -170,7 +170,7 @@ func (self *Map[K, V]) Delete(key K) (value V, exists bool) {
 //	fmt.Println(v, b)     // Output: 1 true
 //	v, b = m.DeleteAt(2)
 //	fmt.Println(v, b)     // Output: 0 false
-func (self *Map[K, V]) DeleteAt(index int) (value V, exists bool) {
+func (self *OrderedMap[K, V]) DeleteAt(index int) (value V, exists bool) {
 	if index < 0 || index >= len(self.keySlice) {
 		return self.z, false
 	}
@@ -209,7 +209,7 @@ func (self *Map[K, V]) DeleteAt(index int) (value V, exists bool) {
 //
 //	one
 //	two
-func (self *Map[K, V]) EnumKeys(callback func(key K) (cont bool)) {
+func (self *OrderedMap[K, V]) EnumKeys(callback func(key K) (cont bool)) {
 	for _, key := range self.keySlice {
 		if !callback(key) {
 			break
@@ -235,7 +235,7 @@ func (self *Map[K, V]) EnumKeys(callback func(key K) (cont bool)) {
 //
 //	1
 //	2
-func (self *Map[K, V]) EnumValues(callback func(value V) (cont bool)) {
+func (self *OrderedMap[K, V]) EnumValues(callback func(value V) (cont bool)) {
 	for _, key := range self.keySlice {
 		if !callback(self.valueMap[key]) {
 			break
@@ -251,7 +251,7 @@ func (self *Map[K, V]) EnumValues(callback func(value V) (cont bool)) {
 //	m.Put("one", 1)
 //	m.Put("two", 2)
 //	fmt.Println(m.Keys()) // Output: [one two]
-func (self *Map[K, V]) Keys() (keys []K) {
+func (self *OrderedMap[K, V]) Keys() (keys []K) {
 	keys = make([]K, len(self.keySlice))
 	copy(keys, self.keySlice)
 	return
@@ -265,7 +265,7 @@ func (self *Map[K, V]) Keys() (keys []K) {
 //	m.Put("one", 1)
 //	m.Put("two", 2)
 //	fmt.Println(m.Values()) // Output: [1 2]
-func (self *Map[K, V]) Values() (values []V) {
+func (self *OrderedMap[K, V]) Values() (values []V) {
 	values = make([]V, len(self.keySlice))
 	for i, key := range self.keySlice {
 		values[i] = self.valueMap[key]
@@ -273,10 +273,10 @@ func (self *Map[K, V]) Values() (values []V) {
 	return
 }
 
-// SyncMap is a thread-safe version of [Map] using a mutex to protect concurrent access.
-type SyncMap[K comparable, V any] struct {
+// OrderedSyncMap is a thread-safe version of [OrderedMap] using a mutex to protect concurrent access.
+type OrderedSyncMap[K comparable, V any] struct {
 	mu sync.Mutex // mutex protecting the map
-	m  *Map[K, V] // the underlying ordered map
+	m  *OrderedMap[K, V] // the underlying ordered map
 }
 
 // NewOrderedSyncMap returns a new, empty, thread-safe OrderedSyncMap.
@@ -284,8 +284,8 @@ type SyncMap[K comparable, V any] struct {
 // Example:
 //
 //	m := NewOrderedSyncMap[string, int]()
-func NewOrderedSyncMap[K comparable, V any]() *SyncMap[K, V] {
-	return &SyncMap[K, V]{
+func NewOrderedSyncMap[K comparable, V any]() *OrderedSyncMap[K, V] {
+	return &OrderedSyncMap[K, V]{
 		m: NewOrderedMap[K, V](),
 	}
 }
@@ -298,7 +298,7 @@ func NewOrderedSyncMap[K comparable, V any]() *SyncMap[K, V] {
 //	m.Put("one", 1)
 //	m.Put("two", 2)
 //	fmt.Println(m.Len()) // Output: 2
-func (self *SyncMap[K, V]) Len() (length int) {
+func (self *OrderedSyncMap[K, V]) Len() (length int) {
 	self.mu.Lock()
 	length = self.m.Len()
 	self.mu.Unlock()
@@ -313,7 +313,7 @@ func (self *SyncMap[K, V]) Len() (length int) {
 //	m.Put("one", 1)
 //	fmt.Println(m.Exists("one"))   // Output: true
 //	fmt.Println(m.Exists("three")) // Output: false
-func (self *SyncMap[K, V]) Exists(key K) (exists bool) {
+func (self *OrderedSyncMap[K, V]) Exists(key K) (exists bool) {
 	self.mu.Lock()
 	exists = self.m.Exists(key)
 	self.mu.Unlock()
@@ -332,7 +332,7 @@ func (self *SyncMap[K, V]) Exists(key K) (exists bool) {
 //	fmt.Println(v, b)     // Output: 1 true
 //	v, b = m.Get("three")
 //	fmt.Println(v, b)     // Output: 0 false
-func (self *SyncMap[K, V]) Get(key K) (value V, exists bool) {
+func (self *OrderedSyncMap[K, V]) Get(key K) (value V, exists bool) {
 	self.mu.Lock()
 	value, exists = self.m.Get(key)
 	self.mu.Unlock()
@@ -352,7 +352,7 @@ func (self *SyncMap[K, V]) Get(key K) (value V, exists bool) {
 //	fmt.Println(v, b)     // Output: 1 true
 //	v, b = m.GetAt(2)
 //	fmt.Println(v, b)     // Output: 0 false
-func (self *SyncMap[K, V]) GetAt(index int) (value V, exists bool) {
+func (self *OrderedSyncMap[K, V]) GetAt(index int) (value V, exists bool) {
 	self.mu.Lock()
 	value, exists = self.m.GetAt(index)
 	self.mu.Unlock()
@@ -369,7 +369,7 @@ func (self *SyncMap[K, V]) GetAt(index int) (value V, exists bool) {
 //	m.Put("two", 2)
 //	m.Put("one", 11)
 //	fmt.Println(m.Get("one")) // Output: 11 true
-func (self *SyncMap[K, V]) Put(key K, value V) {
+func (self *OrderedSyncMap[K, V]) Put(key K, value V) {
 	self.mu.Lock()
 	self.m.Put(key, value)
 	self.mu.Unlock()
@@ -386,7 +386,7 @@ func (self *SyncMap[K, V]) Put(key K, value V) {
 //	fmt.Println(v, b)     // Output: 1 true
 //	v, b = m.Delete("one")
 //	fmt.Println(v, b)     // Output: 0 false
-func (self *SyncMap[K, V]) Delete(key K) (value V, exists bool) {
+func (self *OrderedSyncMap[K, V]) Delete(key K) (value V, exists bool) {
 	self.mu.Lock()
 	value, exists = self.m.Delete(key)
 	self.mu.Unlock()
@@ -405,7 +405,7 @@ func (self *SyncMap[K, V]) Delete(key K) (value V, exists bool) {
 //	fmt.Println(v, b)     // Output: 1 true
 //	v, b = m.DeleteAt(2)
 //	fmt.Println(v, b)     // Output: 0 false
-func (self *SyncMap[K, V]) DeleteAt(index int) (value V, exists bool) {
+func (self *OrderedSyncMap[K, V]) DeleteAt(index int) (value V, exists bool) {
 	self.mu.Lock()
 	value, exists = self.m.DeleteAt(index)
 	self.mu.Unlock()
@@ -429,7 +429,7 @@ func (self *SyncMap[K, V]) DeleteAt(index int) (value V, exists bool) {
 //
 //	one
 //	two
-func (self *SyncMap[K, V]) EnumKeys(callback func(key K) (cont bool)) {
+func (self *OrderedSyncMap[K, V]) EnumKeys(callback func(key K) (cont bool)) {
 	self.mu.Lock()
 	self.m.EnumKeys(callback)
 	self.mu.Unlock()
@@ -453,7 +453,7 @@ func (self *SyncMap[K, V]) EnumKeys(callback func(key K) (cont bool)) {
 //
 //	1
 //	2
-func (self *SyncMap[K, V]) EnumValues(callback func(value V) (cont bool)) {
+func (self *OrderedSyncMap[K, V]) EnumValues(callback func(value V) (cont bool)) {
 	self.mu.Lock()
 	self.m.EnumValues(callback)
 	self.mu.Unlock()
@@ -467,7 +467,7 @@ func (self *SyncMap[K, V]) EnumValues(callback func(value V) (cont bool)) {
 //	m.Put("one", 1)
 //	m.Put("two", 2)
 //	fmt.Println(m.Keys()) // Output: [one two]
-func (self *SyncMap[K, V]) Keys() (keys []K) {
+func (self *OrderedSyncMap[K, V]) Keys() (keys []K) {
 	self.mu.Lock()
 	keys = self.m.Keys()
 	self.mu.Unlock()
@@ -482,7 +482,7 @@ func (self *SyncMap[K, V]) Keys() (keys []K) {
 //	m.Put("one", 1)
 //	m.Put("two", 2)
 //	fmt.Println(m.Values()) // Output: [1 2]
-func (self *SyncMap[K, V]) Values() (values []V) {
+func (self *OrderedSyncMap[K, V]) Values() (values []V) {
 	self.mu.Lock()
 	values = self.m.Values()
 	self.mu.Unlock()
