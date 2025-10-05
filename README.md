@@ -7,7 +7,7 @@ Data structures, various.
 - fs - In-memory file-system.
 - gencache - Rotating cache with comparable keys and any value.
 - graph - Many-to-many, polydirectional map of comparable keys.
-- ordered - Ordered generic map of comparable keys to any value.
+- maps - Generic with comparable keys, SyncMap, OrderedMap and OrderedSyncMap.
 - queue - Generic queue of any type of value.
 - sessions - Generic map of comparable keys to many comparable values with timeout. Intended for in memory session management.
 - stack - generic stack.

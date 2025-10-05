@@ -9,6 +9,186 @@ import (
 	"sync"
 )
 
+// SyncMap is a generic thread-safe map which supports comparable keys
+// and any type of value. It wraps a standard Go map with a mutex for
+// concurrent access. Unlike OrderedMap, it does not maintain insertion order.
+//
+// Example:
+//
+//	m := NewSyncMap[string, int]()<
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	m.Put("three", 3)
+//	fmt.Println(m.Len())   // Output: 3
+//	v, ok := m.Get("two")
+//	fmt.Println(v, ok)     // Output: 2 true
+type SyncMap[K comparable, V any] struct {
+	mu sync.Mutex // mutex protecting the map
+	z  V          // zero value of type V, used for return when not found
+	m  map[K]V    // the underlying map
+}
+
+// NewSyncMap returns a new SyncMap of key K and value V.
+//
+// Example:
+//
+//	m := NewSyncMap[string, int]()
+func NewSyncMap[K comparable, V any]() *SyncMap[K, V] {
+	return &SyncMap[K, V]{
+		z: *new(V),
+		m: make(map[K]V),
+	}
+}
+
+// Len returns the number of elements in the map.
+//
+// Example:
+//
+//	m := NewSyncMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	fmt.Println(m.Len()) // Output: 2
+func (self *SyncMap[K, V]) Len() (length int) {
+	self.mu.Lock()
+	length = len(self.m)
+	self.mu.Unlock()
+	return
+}
+
+// Exists returns true if the given key is present in the map.
+//
+// Example:
+//
+//	m := NewSyncMap[string, int]()
+//	m.Put("one", 1)
+//	fmt.Println(m.Exists("one"))   // Output: true
+//	fmt.Println(m.Exists("three")) // Output: false
+func (self *SyncMap[K, V]) Exists(key K) (exists bool) {
+	self.mu.Lock()
+	_, exists = self.m[key]
+	self.mu.Unlock()
+	return
+}
+
+// Get returns the value associated with the given key and a boolean indicating
+// if the key was found. If the key is not found, it returns the zero value
+// of the value type.
+//
+// Example:
+//
+//	m := NewSyncMap[string, int]()
+//	m.Put("one", 1)
+//	v, b := m.Get("one")
+//	fmt.Println(v, b)     // Output: 1 true
+//	v, b = m.Get("three")
+//	fmt.Println(v, b)     // Output: 0 false
+func (self *SyncMap[K, V]) Get(key K) (value V, exists bool) {
+	self.mu.Lock()
+	value, exists = self.m[key]
+	self.mu.Unlock()
+	return
+}
+
+// Put inserts or updates a key-value pair in the map. It returns the old value
+// (if any) and a boolean indicating if the value was replaced.
+//
+// Example:
+//
+//	m := NewSyncMap[string, int]()
+//	old, found := m.Put("one", 1)
+//	fmt.Println(old, found) // Output: 0 false
+//	old, found = m.Put("one", 11)
+//	fmt.Println(old, found) // Output: 1 true
+func (self *SyncMap[K, V]) Put(key K, value V) (oldValue V, replaced bool) {
+	self.mu.Lock()
+	oldValue, replaced = self.m[key]
+	self.m[key] = value
+	self.mu.Unlock()
+	if !replaced {
+		return self.z, false
+	}
+	return
+}
+
+// Delete removes a key-value pair from the map. It returns the deleted value
+// and a boolean indicating if the key was found.
+//
+// Example:
+//
+//	m := NewSyncMap[string, int]()
+//	m.Put("one", 1)
+//	v, b := m.Delete("one")
+//	fmt.Println(v, b)     // Output: 1 true
+//	v, b = m.Delete("one")
+//	fmt.Println(v, b)     // Output: 0 false
+func (self *SyncMap[K, V]) Delete(key K) (value V, exists bool) {
+	self.mu.Lock()
+	value, exists = self.m[key]
+	if exists {
+		delete(self.m, key)
+	}
+	self.mu.Unlock()
+	if !exists {
+		return self.z, false
+	}
+	return
+}
+
+// Keys returns a slice containing all the keys in the map.
+// Note: The order of keys is not guaranteed.
+//
+// Example:
+//
+//	m := NewSyncMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	keys := m.Keys()
+//	fmt.Println(len(keys)) // Output: 2
+func (self *SyncMap[K, V]) Keys() (keys []K) {
+	self.mu.Lock()
+	keys = make([]K, 0, len(self.m))
+	for k := range self.m {
+		keys = append(keys, k)
+	}
+	self.mu.Unlock()
+	return
+}
+
+// Values returns a slice containing all the values in the map.
+// Note: The order of values is not guaranteed.
+//
+// Example:
+//
+//	m := NewSyncMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	values := m.Values()
+//	fmt.Println(len(values)) // Output: 2
+func (self *SyncMap[K, V]) Values() (values []V) {
+	self.mu.Lock()
+	values = make([]V, 0, len(self.m))
+	for _, v := range self.m {
+		values = append(values, v)
+	}
+	self.mu.Unlock()
+	return
+}
+
+// Clear removes all key-value pairs from the map.
+//
+// Example:
+//
+//	m := NewSyncMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	m.Clear()
+//	fmt.Println(m.Len()) // Output: 0
+func (self *SyncMap[K, V]) Clear() {
+	self.mu.Lock()
+	self.m = make(map[K]V)
+	self.mu.Unlock()
+}
+
 // OrderedMap is a generic ordered map which supports comparable keys
 // and any type of value.  It maintains the order in which keys were
 // inserted.
@@ -273,6 +453,21 @@ func (self *OrderedMap[K, V]) Values() (values []V) {
 	return
 }
 
+// Clear removes all key-value pairs from the map.
+//
+// Example:
+//
+//	m := NewOrderedMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	m.Clear()
+//	fmt.Println(m.Len()) // Output: 0
+func (self *OrderedMap[K, V]) Clear() {
+	self.indexMap = make(map[K]int)
+	self.valueMap = make(map[K]V)
+	self.keySlice = nil
+}
+
 // OrderedSyncMap is a thread-safe version of [OrderedMap] using a mutex to protect concurrent access.
 type OrderedSyncMap[K comparable, V any] struct {
 	mu sync.Mutex // mutex protecting the map
@@ -487,4 +682,19 @@ func (self *OrderedSyncMap[K, V]) Values() (values []V) {
 	values = self.m.Values()
 	self.mu.Unlock()
 	return
+}
+
+// Clear removes all key-value pairs from the map.
+//
+// Example:
+//
+//	m := NewOrderedSyncMap[string, int]()
+//	m.Put("one", 1)
+//	m.Put("two", 2)
+//	m.Clear()
+//	fmt.Println(m.Len()) // Output: 0
+func (self *OrderedSyncMap[K, V]) Clear() {
+	self.mu.Lock()
+	self.m.Clear()
+	self.mu.Unlock()
 }

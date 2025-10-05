@@ -320,6 +320,57 @@ func TestSyncMap(t *testing.T) {
 	})
 }
 
+func BenchmarkSyncMapPut(b *testing.B) {
+	m := NewSyncMap[string, int]()
+	k := make([]string, b.N)
+	for i := 0; i < b.N; i++ {
+		k[i] = strconv.Itoa(i)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m.Put(k[i], i)
+	}
+}
+
+func BenchmarkSyncMapGet(b *testing.B) {
+	m := NewSyncMap[string, int]()
+	k := make([]string, b.N)
+	for i := 0; i < b.N; i++ {
+		k[i] = strconv.Itoa(i)
+		m.Put(k[i], i)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m.Get(k[i])
+	}
+}
+
+func BenchmarkSyncMapDelete(b *testing.B) {
+	m := NewSyncMap[string, int]()
+	k := make([]string, b.N)
+	for i := 0; i < b.N; i++ {
+		k[i] = strconv.Itoa(i)
+		m.Put(k[i], i)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m.Delete(k[i])
+	}
+}
+
+func BenchmarkSyncMapDeleteReverse(b *testing.B) {
+	m := NewSyncMap[string, int]()
+	k := make([]string, b.N)
+	for i := 0; i < b.N; i++ {
+		k[i] = strconv.Itoa(i)
+		m.Put(k[i], i)
+	}
+	b.ResetTimer()
+	for i := b.N - 1; i >= 0; i-- {
+		m.Delete(k[i])
+	}
+}
+
 func BenchmarkOrderedMapPut(b *testing.B) {
 	m := NewOrderedMap[string, int]()
 	k := make([]string, b.N)

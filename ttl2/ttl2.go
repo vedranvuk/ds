@@ -345,5 +345,4 @@ func (self *TTL[K]) doOnTimeout(key K) {
 	if self.cb != nil {
 		go self.cb(key)
 	}
-	return
 }
